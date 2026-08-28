@@ -92,6 +92,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ─────────── 설정 ─────────── */
 const STAFF = ["유정미 매니저","강민경","김가람","김민정","박시은","윤이나","이다운","장세빈","정예은","정유나"];
 const KEY = "casape-attendance-v1";
+const ADMIN_PW = "admin";   /* 근무 요약 열람용 — 소스에 그대로 있으므로 화면 가림 용도입니다 */
 const DAYS = ["일","월","화","수","목","금","토"];
 
 /* ─────────── 유틸 ─────────── */
@@ -479,6 +480,8 @@ function App(){
   const [now, setNow] = useState(Date.now());
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
+  const [admin, setAdmin] = useState(false);
+  const [pw, setPw] = useState("");
   const [flash, setFlash] = useState(null);
   const toastT = useRef(null);
 
@@ -512,6 +515,11 @@ function App(){
     setSettings(next);
     try{ localStorage.setItem(SKEY, JSON.stringify(next)); }catch(e){}
   };
+
+  function unlock(){
+    if(pw === ADMIN_PW){ setAdmin(true); setPw(""); say("관리자 확인 — 근무 요약을 엽니다"); }
+    else { setPw(""); say("비밀번호가 올바르지 않습니다"); }
+  }
 
   function say(msg){
     setToast(msg);
@@ -879,11 +887,35 @@ function App(){
           ))}
         </section>
 
-        {/* ── 요약 ── */}
-        <section className="reveal mt-16">
+        {/* ── 요약 (관리자 전용) ── */}
+        {!admin ? (
+        <section className="mt-16">
           <div className="flex items-center gap-4 mb-5">
             <h2 className="han text-[24px] text-ink leading-none">근무 요약</h2>
             <div className="h-px flex-1 bg-line"></div>
+          </div>
+          <div className="rounded-[20px] border border-line bg-card px-6 py-12 text-center shadow-[0_16px_36px_-30px_rgba(36,28,21,.5)]">
+            <div className="num text-[10px] font-bold tracking-[.22em] text-muted">ADMIN ONLY</div>
+            <p className="mt-3 text-[13.5px] leading-relaxed text-ink2">
+              근무 요약은 관리자만 볼 수 있습니다.<br />비밀번호를 입력해 주세요.
+            </p>
+            <form onSubmit={e => { e.preventDefault(); unlock(); }}
+              className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              <input type="password" value={pw} onChange={e => setPw(e.target.value)}
+                placeholder="비밀번호" aria-label="관리자 비밀번호"
+                className="w-[180px] rounded-xl border border-line bg-paper/60 px-4 py-3 text-[15px] text-ink text-center focus:border-cobalt transition-colors" />
+              <button type="submit"
+                className="rounded-xl bg-ink px-5 py-3 text-[13.5px] font-semibold text-paper hover:bg-cobalt transition-colors">확인</button>
+            </form>
+          </div>
+        </section>
+        ) : (
+        <section className="mt-16">
+          <div className="flex flex-wrap items-center gap-4 mb-5">
+            <h2 className="han text-[24px] text-ink leading-none">근무 요약</h2>
+            <div className="h-px flex-1 bg-line"></div>
+            <button onClick={() => { setAdmin(false); say("근무 요약을 다시 잠갔습니다"); }}
+              className="rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] font-medium text-ink2 hover:border-cobalt hover:text-cobalt transition-colors">잠그기</button>
             <button onClick={() => openCSV(prettyDate(viewKey) + " CSV", [viewKey])}
               className="rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] font-medium text-ink2 hover:border-cobalt hover:text-cobalt transition-colors">이 날짜 CSV</button>
             <button onClick={() => openCSV("전체 기록 CSV", Object.keys(db))}
@@ -940,6 +972,7 @@ function App(){
             메모칸 오른쪽 ↺ 는 그 사람의 그날 출퇴근 시각을 처음으로 되돌립니다.
           </p>
         </section>
+        )}
         </>
         )}
       </main>
