@@ -3,682 +3,593 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0E6B58">
-<title>출퇴근 체크 보드</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap">
-<style>
-:root{
-  --paper:#E9EDE9; --card:#FDFDFC; --card-2:#F4F6F3;
-  --ink:#14201C; --ink-2:#46554F; --muted:#7C8B84;
-  --line:#D3DAD4; --line-2:#E4E9E4;
-  --accent:#0E6B58; --accent-ink:#0B5647; --accent-soft:#DEEDE7;
-  --done:#2A5C93; --done-soft:#E1EBF5;
-  --idle:#9AA69F; --idle-soft:#EDEFEC;
-  --warn:#A8631F;
-  --shadow:0 1px 2px rgba(20,32,28,.05), 0 8px 24px -12px rgba(20,32,28,.18);
-  --r:14px;
-}
-:root:not([data-theme="light"]) { color-scheme: light; }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    color-scheme: dark;
-    --paper:#0F1513; --card:#19211E; --card-2:#141B19;
-    --ink:#E9EEEB; --ink-2:#AFBDB6; --muted:#78877F;
-    --line:#2B3733; --line-2:#222C29;
-    --accent:#4CC3A4; --accent-ink:#8FE0C9; --accent-soft:#123028;
-    --done:#84B4E4; --done-soft:#152840;
-    --idle:#6C7A73; --idle-soft:#1D2624;
-    --warn:#D79B4E;
-    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+<meta name="theme-color" content="#F3F1EA">
+<meta name="description" content="카사페 직원 출퇴근 도장 보드">
+<title>출퇴근 도장 보드</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Black+Han+Sans&family=Gothic+A1:wght@300;400;500;700;800&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        paper:  "#F3F1EA",
+        paper2: "#EBE7DC",
+        card:   "#FFFDF8",
+        ink:    "#241C15",
+        ink2:   "#5C5046",
+        muted:  "#94897C",
+        line:   "#E2DCCF",
+        line2:  "#EFEBE0",
+        cobalt: "#23479B",
+        cobalt2:"#4A72CE",
+        cobaltSoft:"#E4EAF7",
+        gold:   "#B57C08",
+        gold2:  "#E8A317",
+        goldSoft:"#FAEDD2"
+      },
+      fontFamily: {
+        han:  ['"Black Han Sans"','"Apple SD Gothic Neo"','sans-serif'],
+        sans: ['"Gothic A1"','"Apple SD Gothic Neo"','"Malgun Gothic"','system-ui','sans-serif'],
+        num:  ['Archivo','"Gothic A1"','system-ui','sans-serif']
+      }
+    }
   }
 }
-:root[data-theme="dark"]{
-  color-scheme: dark;
-  --paper:#0F1513; --card:#19211E; --card-2:#141B19;
-  --ink:#E9EEEB; --ink-2:#AFBDB6; --muted:#78877F;
-  --line:#2B3733; --line-2:#222C29;
-  --accent:#4CC3A4; --accent-ink:#8FE0C9; --accent-soft:#123028;
-  --done:#84B4E4; --done-soft:#152840;
-  --idle:#6C7A73; --idle-soft:#1D2624;
-  --warn:#D79B4E;
-  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
-}
-
-*{box-sizing:border-box}
-html,body{margin:0;padding:0}
-body{
-  background:var(--paper);
-  color:var(--ink);
-  font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
-  font-weight:400;
-  -webkit-font-smoothing:antialiased;
-  -webkit-tap-highlight-color:transparent;
-  padding:0 0 48px;
-}
-.mono{font-family:"IBM Plex Mono","SFMono-Regular",Menlo,monospace;font-variant-numeric:tabular-nums}
-button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
-
-.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
-
-/* ── header ───────────────────────────── */
-header{
-  position:sticky;top:0;z-index:20;
-  background:color-mix(in srgb, var(--paper) 88%, transparent);
-  backdrop-filter:blur(10px);
-  border-bottom:1px solid var(--line);
-}
-.hbar{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:14px 0 13px}
-.brand{display:flex;flex-direction:column;gap:3px;margin-right:auto}
-.eyebrow{
-  font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;
-  letter-spacing:.16em;color:var(--muted);text-transform:uppercase;
-}
-.dateline{font-size:17px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
-.clock{
-  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
-  font-size:34px;font-weight:500;letter-spacing:-.02em;line-height:1;
-  color:var(--ink);
-}
-.clock .sec{font-size:20px;color:var(--muted);margin-left:2px}
-.tally{display:flex;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
-.tally div{padding:7px 14px;display:flex;flex-direction:column;gap:2px;min-width:64px;border-right:1px solid var(--line-2)}
-.tally div:last-child{border-right:0}
-.tally b{font-family:"IBM Plex Mono",monospace;font-size:19px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
-.tally span{font-size:10.5px;color:var(--muted);letter-spacing:.02em}
-.t-work b{color:var(--accent)} .t-done b{color:var(--done)} .t-idle b{color:var(--muted)}
-
-/* ── date nav ─────────────────────────── */
-.datenav{display:flex;align-items:center;gap:8px;padding:0 0 14px;flex-wrap:wrap}
-.nbtn{
-  border:1px solid var(--line);background:var(--card);border-radius:9px;
-  padding:7px 12px;font-size:13px;font-weight:500;color:var(--ink-2);
-  transition:border-color .12s, color .12s;
-}
-.nbtn:hover{border-color:var(--accent);color:var(--accent)}
-.nbtn[disabled]{opacity:.35;cursor:default}
-.nbtn[disabled]:hover{border-color:var(--line);color:var(--ink-2)}
-input[type=date]{
-  border:1px solid var(--line);background:var(--card);color:var(--ink);
-  border-radius:9px;padding:7px 10px;font-family:"IBM Plex Mono",monospace;font-size:13px;
-}
-.spacer{margin-left:auto}
-.lockbar{
-  display:none;align-items:center;gap:9px;
-  background:var(--done-soft);border:1px solid var(--line);border-radius:10px;
-  padding:9px 13px;font-size:13px;color:var(--done);margin-bottom:14px;
-}
-.lockbar.on{display:flex}
-
-/* ── cards ────────────────────────────── */
-.grid{
-  display:grid;gap:14px;
-  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
-  padding-top:2px;
-}
-.card{
-  position:relative;background:var(--card);
-  border:1px solid var(--line);border-radius:var(--r);
-  box-shadow:var(--shadow);overflow:hidden;
-  display:flex;flex-direction:column;
-}
-.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--idle)}
-.card.s-work::before{background:var(--accent)}
-.card.s-done::before{background:var(--done)}
-
-.punch{
-  display:block;width:100%;text-align:left;
-  padding:16px 16px 14px 19px;
-  transition:background .12s;
-}
-.punch:hover{background:var(--card-2)}
-.punch:active{background:var(--accent-soft)}
-.card.locked .punch{cursor:default}
-.card.locked .punch:hover,.card.locked .punch:active{background:none}
-
-.nameline{display:flex;align-items:center;gap:10px;margin-bottom:11px}
-.nm{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1}
-.pill{
-  margin-left:auto;font-size:11px;font-weight:500;letter-spacing:.03em;
-  padding:4px 9px;border-radius:999px;white-space:nowrap;
-  background:var(--idle-soft);color:var(--muted);
-}
-.card.s-work .pill{background:var(--accent-soft);color:var(--accent-ink)}
-.card.s-done .pill{background:var(--done-soft);color:var(--done)}
-
-.stamps{display:flex;gap:16px;margin-bottom:12px}
-.stamp{display:flex;flex-direction:column;gap:3px;min-width:58px}
-.stamp .lb{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.13em;color:var(--muted)}
-.stamp .vl{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.1}
-.stamp .vl.off{color:var(--idle);font-weight:400}
-
-.dur{
-  display:flex;align-items:baseline;gap:7px;
-  padding-top:11px;border-top:1px dashed var(--line-2);
-}
-.dur .dl{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.13em;color:var(--muted)}
-.dur .dv{font-size:16px;font-weight:600;margin-left:auto;letter-spacing:-.01em}
-.card.s-idle .dur .dv{color:var(--idle);font-weight:400}
-.card.s-work .dur .dv{color:var(--accent)}
-.card.s-done .dur .dv{color:var(--done)}
-.dur .dv .u{font-size:12px;font-weight:400;color:var(--muted);margin:0 1px 0 1px}
-
-.memo{border-top:1px solid var(--line-2);background:var(--card-2);display:flex;align-items:stretch}
-.memo textarea{
-  display:block;flex:1;min-width:0;border:0;background:none;resize:none;
-  font-family:inherit;font-size:12.5px;line-height:1.5;color:var(--ink-2);
-  padding:10px 14px 11px 19px;min-height:56px;
-}
-.memo textarea::placeholder{color:var(--muted);opacity:.85}
-.memo textarea:focus{outline:none;background:var(--card);color:var(--ink)}
-.memo textarea[readonly]{cursor:default}
-
-.undo{
-  flex:0 0 auto;width:38px;
-  display:none;align-items:center;justify-content:center;
-  color:var(--muted);font-size:15px;line-height:1;
-  border-left:1px solid var(--line-2);
-  transition:color .12s,background .12s;
-}
-.card.s-work .undo,.card.s-done .undo{display:flex}
-.card.locked .undo{display:none}
-.undo:hover{color:var(--warn);background:var(--card)}
-
-/* ── summary ──────────────────────────── */
-.sec-h{
-  display:flex;align-items:center;gap:12px;margin:34px 0 12px;
-}
-.sec-h h2{font-size:14px;font-weight:600;letter-spacing:.01em;margin:0}
-.sec-h .rule{flex:1;height:1px;background:var(--line)}
-.tools{display:flex;gap:8px}
-
-.tablewrap{
-  overflow-x:auto;background:var(--card);
-  border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);
-}
-table{border-collapse:collapse;width:100%;min-width:560px;font-size:13.5px}
-th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line-2);white-space:nowrap}
-th{
-  font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:500;
-  letter-spacing:.13em;color:var(--muted);background:var(--card-2);
-}
-tbody tr:last-child td{border-bottom:0}
-td.t{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
-td.memo-c{white-space:normal;color:var(--ink-2);font-size:12.5px;max-width:280px}
-td .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--idle)}
-tr.r-work .dot{background:var(--accent)} tr.r-done .dot{background:var(--done)}
-tfoot td{background:var(--card-2);font-weight:600;border-top:1px solid var(--line)}
-
-/* ── modal ────────────────────────────── */
-.scrim{
-  position:fixed;inset:0;z-index:50;display:none;
-  align-items:center;justify-content:center;padding:20px;
-  background:rgba(10,18,16,.42);backdrop-filter:blur(3px);
-}
-.scrim.on{display:flex}
-.modal{
-  background:var(--card);border:1px solid var(--line);border-radius:16px;
-  box-shadow:0 24px 60px -20px rgba(0,0,0,.5);
-  width:100%;max-width:400px;padding:24px;
-  animation:pop .16s ease-out;
-}
-.modal.wide{max-width:620px}
-@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.modal{animation:none}*{transition:none!important}}
-.modal h3{margin:0 0 8px;font-size:19px;font-weight:600;letter-spacing:-.01em}
-.modal p{margin:0 0 20px;font-size:13.5px;line-height:1.65;color:var(--ink-2)}
-.modal p b{color:var(--ink);font-weight:600}
-.modal .big{
-  font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:500;
-  color:var(--accent);letter-spacing:-.02em;
-}
-.mrow{display:flex;gap:9px;justify-content:flex-end}
-.btn{
-  border-radius:10px;padding:10px 17px;font-size:13.5px;font-weight:500;
-  border:1px solid var(--line);background:var(--card);color:var(--ink-2);
-}
-.btn:hover{border-color:var(--muted)}
-.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn.pri:hover{filter:brightness(1.08)}
-.modal textarea.csv{
-  width:100%;height:230px;border:1px solid var(--line);border-radius:10px;
-  background:var(--card-2);color:var(--ink);padding:12px;
-  font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.6;resize:vertical;
-  margin-bottom:16px;
-}
-
-.toast{
-  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(14px);
-  background:var(--ink);color:var(--paper);
-  padding:11px 19px;border-radius:999px;font-size:13px;font-weight:500;
-  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;
-}
-.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
-
-footer{margin-top:34px;font-size:11.5px;color:var(--muted);line-height:1.7}
-
-@media (max-width:640px){
-  .wrap{padding:0 14px}
-  .clock{font-size:28px}
-  .hbar{gap:12px}
-  .tally{width:100%}
-  .tally div{flex:1;min-width:0}
-  .grid{grid-template-columns:1fr 1fr;gap:10px}
-  .nm{font-size:20px}
-  .punch{padding:13px 12px 12px 16px}
-  .stamps{gap:12px}
-}
-@media (max-width:400px){ .grid{grid-template-columns:1fr} }
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { background:#F3F1EA; color:#241C15; margin:0; font-family:"Gothic A1","Apple SD Gothic Neo",system-ui,sans-serif; }
+  .num { font-family:Archivo,"Gothic A1",system-ui,sans-serif; font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1; }
+  .han { font-family:"Black Han Sans","Apple SD Gothic Neo",sans-serif; }
+  .grain{
+    position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.35;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.22'/></svg>");
+  }
+  .glow{
+    position:fixed; z-index:0; width:620px; height:620px; margin:-310px 0 0 -310px;
+    border-radius:50%; pointer-events:none; will-change:transform;
+    background:radial-gradient(circle, rgba(232,163,23,.22) 0%, rgba(232,163,23,.10) 38%, rgba(232,163,23,0) 68%);
+    filter:blur(18px); opacity:0; transition:opacity .5s ease;
+  }
+  .reveal{ opacity:0; transform:translateY(18px); transition:opacity .7s cubic-bezier(.2,.7,.3,1), transform .7s cubic-bezier(.2,.7,.3,1); }
+  .reveal.in{ opacity:1; transform:none; }
+  .stamp-pop{ animation:stampIn .42s cubic-bezier(.2,1.5,.4,1) both; }
+  @keyframes stampIn{ 0%{transform:rotate(-26deg) scale(1.5); opacity:0} 55%{opacity:1} 100%{transform:rotate(-9deg) scale(1); opacity:1} }
+  .pulse-dot{ animation:pd 2.2s ease-in-out infinite; }
+  @keyframes pd{ 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:.35; transform:scale(.78)} }
+  .marq{ animation:mq 34s linear infinite; }
+  @keyframes mq{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
+  .modal-in{ animation:mi .2s cubic-bezier(.2,.8,.3,1) both; }
+  @keyframes mi{ from{opacity:0; transform:translateY(14px) scale(.98)} to{opacity:1; transform:none} }
+  textarea{ font-family:inherit; }
+  ::selection{ background:#23479B; color:#FFFDF8; }
+  *:focus-visible{ outline:2px solid #23479B; outline-offset:3px; border-radius:8px; }
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    .reveal{opacity:1 !important; transform:none !important; transition:none}
+    .stamp-pop,.pulse-dot,.marq,.modal-in{animation:none !important}
+    *{transition-duration:.01ms !important}
+  }
 </style>
+
 </head>
 <body>
+<div class="grain"></div>
+<div id="glow" class="glow"></div>
+<div id="root" class="relative" style="z-index:2"></div>
 
-<header>
-  <div class="wrap hbar">
-    <div class="brand">
-      <div class="eyebrow">CASAPE · ATTENDANCE</div>
-      <div class="dateline" id="dateline">—</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+/* ─────────── 설정 ─────────── */
+const STAFF = ["강민경","정유나","이다운","박시은","김민정","정예은","윤이나","장세빈","김가람"];
+const KEY = "casape-attendance-v1";
+const DAYS = ["일","월","화","수","목","금","토"];
+
+/* ─────────── 유틸 ─────────── */
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const todayKey = () => ymd(new Date());
+const parseKey = k => { const p=k.split("-"); return new Date(+p[0],+p[1]-1,+p[2]); };
+const prettyDate = k => { const d=parseKey(k); return `${d.getMonth()+1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일`; };
+const yearOf = k => parseKey(k).getFullYear();
+const hhmm = ts => { const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); };
+const durPlain = ms => { ms=Math.max(0,ms); const m=Math.floor(ms/60000); return `${Math.floor(m/60)}시간 ${m%60}분`; };
+
+function loadDB(){
+  try{ const r=localStorage.getItem(KEY); const o=r?JSON.parse(r):{}; return (o&&typeof o==="object")?o:{}; }
+  catch(e){ return {}; }
+}
+const blank = () => ({ in:null, out:null, memo:"" });
+const getRec = (db,k,n) => (db[k] && db[k][n]) || blank();
+const stateOf = r => !r.in ? "idle" : (!r.out ? "work" : "done");
+
+const TONE = {
+  idle: { label:"미출근",   ink:"text-muted",      ring:"border-line",       chip:"bg-paper2 text-muted",        bar:"bg-line" },
+  work: { label:"근무중",   ink:"text-gold",       ring:"border-gold2/70",   chip:"bg-goldSoft text-gold",       bar:"bg-gold2" },
+  done: { label:"퇴근완료", ink:"text-cobalt",     ring:"border-cobalt2/60", chip:"bg-cobaltSoft text-cobalt",   bar:"bg-cobalt" }
+};
+
+/* ─────────── 커서 광원 ─────────── */
+function useGlow(){
+  useEffect(() => {
+    const el = document.getElementById("glow");
+    if(!el) return;
+    if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if(!window.matchMedia("(pointer: fine)").matches) return;
+    let tx=innerWidth/2, ty=innerHeight*0.3, x=tx, y=ty, raf;
+    const move = e => { tx=e.clientX; ty=e.clientY; el.style.opacity=1; };
+    const loop = () => { x+=(tx-x)*0.075; y+=(ty-y)*0.075;
+      el.style.transform=`translate3d(${x}px,${y}px,0)`; raf=requestAnimationFrame(loop); };
+    window.addEventListener("pointermove", move, {passive:true});
+    loop();
+    return () => { window.removeEventListener("pointermove", move); cancelAnimationFrame(raf); };
+  }, []);
+}
+
+/* ─────────── 스크롤 리빌 ─────────── */
+function useReveal(){
+  useEffect(() => {
+    const els = document.querySelectorAll(".reveal");
+    const io = new IntersectionObserver(es => es.forEach(e => { if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); }}), {threshold:.12});
+    els.forEach(e => io.observe(e));
+    return () => io.disconnect();
+  }, []);
+}
+
+/* ─────────── 도장 ─────────── */
+function Stamp({ st, justChanged }){
+  if(st === "idle"){
+    return (
+      <div className="w-[68px] h-[68px] rounded-full border-2 border-dashed border-line flex items-center justify-center shrink-0
+                      transition-all duration-300 group-hover:border-gold2/60 group-hover:rotate-6">
+        <span className="text-[11px] text-muted tracking-[.14em] transition-colors group-hover:text-gold">출근</span>
+      </div>
+    );
+  }
+  const done = st === "done";
+  const c = done ? "text-cobalt border-cobalt" : "text-gold border-gold";
+  return (
+    <div className={`relative w-[68px] h-[68px] shrink-0 ${justChanged ? "stamp-pop" : ""}`} style={{transform:"rotate(-9deg)"}}>
+      <div className={`absolute inset-0 rounded-full border-[2.5px] ${c} opacity-90`}></div>
+      <div className={`absolute inset-[5px] rounded-full border ${c} opacity-45`}></div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+        <span className={`han text-[15px] ${c.split(" ")[0]}`}>{done ? "퇴근" : "근무"}</span>
+        <span className={`num text-[10px] mt-[3px] font-semibold tracking-wider ${c.split(" ")[0]} opacity-75`}>
+          {done ? "OUT" : "IN"}
+        </span>
+      </div>
     </div>
-    <div class="clock mono"><span id="clock">--:--</span><span class="sec" id="clocksec">:--</span></div>
-    <div class="tally">
-      <div class="t-work"><b id="cWork">0</b><span>근무중</span></div>
-      <div class="t-done"><b id="cDone">0</b><span>퇴근</span></div>
-      <div class="t-idle"><b id="cIdle">0</b><span>미출근</span></div>
+  );
+}
+
+/* ─────────── 카드 ─────────── */
+function Card({ name, rec, locked, now, onPunch, onMemo, onUndo, flash }){
+  const st = stateOf(rec);
+  const t = TONE[st];
+  const dur = st === "work" ? now - rec.in : (st === "done" ? rec.out - rec.in : 0);
+
+  return (
+    <article className={`group relative rounded-[20px] bg-card border overflow-hidden
+      transition-all duration-300 ease-out
+      ${st==="work" ? "border-gold2/45 shadow-[0_2px_0_0_rgba(232,163,23,.18),0_18px_38px_-26px_rgba(36,28,21,.5)]"
+        : st==="done" ? "border-cobalt2/35 shadow-[0_1px_0_0_rgba(35,71,155,.12),0_16px_34px_-28px_rgba(36,28,21,.45)]"
+        : "border-line shadow-[0_14px_30px_-28px_rgba(36,28,21,.45)]"}
+      ${locked ? "" : "hover:-translate-y-[3px] hover:shadow-[0_26px_46px_-26px_rgba(36,28,21,.42)]"}`}>
+
+      <div className={`absolute left-0 top-0 h-[3px] w-full ${t.bar} transition-all duration-500
+                       ${st==="idle" ? "opacity-30" : "opacity-100"}`}></div>
+
+      <button type="button" onClick={onPunch}
+        className={`block w-full text-left px-6 pt-6 pb-5 ${locked ? "cursor-default" : "cursor-pointer"}`}>
+        <div className="flex items-start gap-4">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[27px] font-extrabold tracking-[-.035em] leading-none text-ink">{name}</h3>
+            <div className={`mt-3 inline-flex items-center gap-[7px] rounded-full px-[10px] py-[4px] text-[11.5px] font-medium ${t.chip}`}>
+              {st === "work" && <span className="w-[6px] h-[6px] rounded-full bg-gold2 pulse-dot"></span>}
+              {t.label}
+            </div>
+          </div>
+          <Stamp st={st} justChanged={flash} />
+        </div>
+
+        <div className="mt-6 flex gap-8">
+          <div>
+            <div className="num text-[9.5px] font-semibold tracking-[.19em] text-muted">IN</div>
+            <div className={`num text-[22px] font-semibold mt-[3px] leading-none ${rec.in ? "text-ink" : "text-line"}`}>
+              {rec.in ? hhmm(rec.in) : "--:--"}
+            </div>
+          </div>
+          <div>
+            <div className="num text-[9.5px] font-semibold tracking-[.19em] text-muted">OUT</div>
+            <div className={`num text-[22px] font-semibold mt-[3px] leading-none ${rec.out ? "text-ink" : "text-line"}`}>
+              {rec.out ? hhmm(rec.out) : "--:--"}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-dashed border-line2 flex items-baseline">
+          <span className="num text-[9.5px] font-semibold tracking-[.19em] text-muted">TOTAL</span>
+          <span className={`ml-auto text-[17px] font-bold tracking-tight ${st==="idle" ? "text-line" : t.ink}`}>
+            {st === "idle" ? "—" : durPlain(dur)}
+            {st === "work" && <span className="ml-[6px] text-[11px] font-medium text-muted">진행중</span>}
+          </span>
+        </div>
+      </button>
+
+      <div className="flex items-stretch border-t border-line2 bg-paper/55">
+        <textarea rows="2" value={rec.memo || ""} readOnly={locked}
+          onChange={e => onMemo(e.target.value)}
+          placeholder={locked ? "" : "메모 — 지각 사유, 조퇴 등"}
+          className="flex-1 min-w-0 resize-none bg-transparent px-6 py-3 text-[12.5px] leading-relaxed text-ink2
+                     placeholder:text-muted/75 focus:outline-none focus:bg-card/90 transition-colors" />
+        {!locked && st !== "idle" && (
+          <button type="button" onClick={onUndo} title={`${name} 기록 되돌리기`} aria-label={`${name} 기록 되돌리기`}
+            className="w-[46px] shrink-0 border-l border-line2 text-muted text-[15px]
+                       hover:text-gold hover:bg-goldSoft/60 transition-colors">↺</button>
+        )}
+      </div>
+    </article>
+  );
+}
+
+/* ─────────── 모달 ─────────── */
+function Modal({ data, onClose }){
+  const ref = useRef(null);
+  useEffect(() => {
+    const k = e => { if(e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", k);
+    const b = ref.current && ref.current.querySelector("[data-focus]");
+    if(b) b.focus();
+    return () => document.removeEventListener("keydown", k);
+  }, [onClose]);
+  if(!data) return null;
+
+  return (
+    <div onMouseDown={e => { if(e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-5"
+      style={{background:"rgba(36,28,21,.42)", backdropFilter:"blur(4px)"}}>
+      <div ref={ref} role="dialog" aria-modal="true"
+        className={`modal-in w-full ${data.wide ? "max-w-[640px]" : "max-w-[420px]"} rounded-[22px] bg-card border border-line p-7
+                    shadow-[0_40px_80px_-30px_rgba(36,28,21,.6)]`}>
+        <h3 className="han text-[22px] text-ink leading-tight">{data.title}</h3>
+        <div className="mt-3 text-[13.5px] leading-relaxed text-ink2">{data.body}</div>
+        <div className="mt-7 flex justify-end gap-2.5">
+          <button onClick={onClose}
+            className="rounded-xl border border-line px-4 py-2.5 text-[13.5px] font-medium text-ink2 hover:border-muted transition-colors">
+            {data.cancelText || "취소"}
+          </button>
+          {data.okText && (
+            <button data-focus onClick={() => { onClose(); data.onOk && data.onOk(); }}
+              className="rounded-xl bg-cobalt px-5 py-2.5 text-[13.5px] font-semibold text-card hover:bg-cobalt2 transition-colors">
+              {data.okText}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
-  </div>
-</header>
-
-<main class="wrap">
-  <div class="datenav">
-    <button class="nbtn" id="prevDay">◀ 이전날</button>
-    <input type="date" id="datePick">
-    <button class="nbtn" id="nextDay">다음날 ▶</button>
-    <button class="nbtn" id="todayBtn">오늘</button>
-  </div>
-
-  <div class="lockbar" id="lockbar">
-    <span>지난 날짜 기록을 보고 있습니다 — 조회 전용입니다. 체크하려면 <b>오늘</b>로 돌아가세요.</span>
-  </div>
-
-  <div class="grid" id="grid"></div>
-
-  <div class="sec-h">
-    <h2>근무 요약</h2>
-    <div class="rule"></div>
-    <div class="tools">
-      <button class="nbtn" id="csvDay">이 날짜 CSV</button>
-      <button class="nbtn" id="csvAll">전체 CSV</button>
-    </div>
-  </div>
-
-  <div class="tablewrap">
-    <table>
-      <thead><tr><th>이름</th><th>출근</th><th>퇴근</th><th>근무시간</th><th>메모</th></tr></thead>
-      <tbody id="tbody"></tbody>
-      <tfoot><tr><td>합계</td><td class="t">—</td><td class="t">—</td><td class="t" id="totalDur">—</td><td></td></tr></tfoot>
-    </table>
-  </div>
-
-  <footer>
-    기록은 이 기기의 브라우저에 자동 저장됩니다. 다른 기기에서는 보이지 않으며, 브라우저 데이터를 지우면 함께 삭제됩니다.<br>
-    카드를 한 번 누르면 출근, 다시 누르면 퇴근입니다. 메모칸 오른쪽 ↺ 는 그 사람의 그날 기록을 처음으로 되돌립니다.
-  </footer>
-</main>
-
-<div class="scrim" id="scrim">
-  <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
-</div>
-<div class="toast" id="toast"></div>
-
-<script>
-(function(){
-"use strict";
-
-var STAFF = ["강민경","정유나","이다운","박시은","김민정","정예은","윤이나","장세빈","김가람"];
-var KEY = "casape-attendance-v1";
-var DAYS = ["일","월","화","수","목","금","토"];
-
-/* ── storage (safe) ───────────────────── */
-var DB = {};
-function load(){
-  try{
-    var raw = localStorage.getItem(KEY);
-    DB = raw ? JSON.parse(raw) : {};
-    if(!DB || typeof DB !== "object") DB = {};
-  }catch(e){ DB = {}; }
-}
-function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify(DB)); }
-  catch(e){ toast("저장 공간에 쓸 수 없어 이번 기록이 남지 않았습니다"); }
+  );
 }
 
-/* ── date helpers ─────────────────────── */
-function ymd(d){
-  return d.getFullYear() + "-" +
-    String(d.getMonth()+1).padStart(2,"0") + "-" +
-    String(d.getDate()).padStart(2,"0");
-}
-function todayKey(){ return ymd(new Date()); }
-function parseKey(k){ var p = k.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
-function prettyDate(k){
-  var d = parseKey(k);
-  return d.getFullYear() + "년 " + (d.getMonth()+1) + "월 " + d.getDate() + "일 (" + DAYS[d.getDay()] + ")";
-}
-function hhmm(ts){
-  var d = new Date(ts);
-  return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
-}
-function durText(ms){
-  if(ms < 0) ms = 0;
-  var m = Math.floor(ms/60000), h = Math.floor(m/60);
-  m = m % 60;
-  if(h === 0) return m + '<span class="u">분</span>';
-  return h + '<span class="u">시간</span> ' + m + '<span class="u">분</span>';
-}
-function durPlain(ms){
-  if(ms < 0) ms = 0;
-  var m = Math.floor(ms/60000), h = Math.floor(m/60);
-  return h + "시간 " + (m%60) + "분";
-}
+/* ─────────── 앱 ─────────── */
+function App(){
+  const [db, setDb] = useState(loadDB);
+  const [viewKey, setViewKey] = useState(todayKey);
+  const [activeKey, setActiveKey] = useState(todayKey);
+  const [now, setNow] = useState(Date.now());
+  const [modal, setModal] = useState(null);
+  const [toast, setToast] = useState("");
+  const [flash, setFlash] = useState(null);
+  const toastT = useRef(null);
 
-/* ── record access ────────────────────── */
-var viewKey = todayKey();
-function day(k){ if(!DB[k]) DB[k] = {}; return DB[k]; }
-function rec(k, name){
-  var d = day(k);
-  if(!d[name]) d[name] = { in:null, out:null, memo:"" };
-  return d[name];
-}
-function stateOf(r){
-  if(!r.in) return "idle";
-  if(!r.out) return "work";
-  return "done";
-}
-function isLocked(){ return viewKey !== todayKey(); }
+  useGlow();
+  useReveal();
 
-/* ── build cards ──────────────────────── */
-var grid = document.getElementById("grid");
-var cardMap = {};
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
-STAFF.forEach(function(name){
-  var card = document.createElement("article");
-  card.className = "card";
-  card.innerHTML =
-    '<button class="punch" type="button">' +
-      '<div class="nameline"><span class="nm">' + name + '</span><span class="pill">미출근</span></div>' +
-      '<div class="stamps">' +
-        '<div class="stamp"><span class="lb">IN</span><span class="vl off">--:--</span></div>' +
-        '<div class="stamp"><span class="lb">OUT</span><span class="vl off">--:--</span></div>' +
-      '</div>' +
-      '<div class="dur"><span class="dl">TOTAL</span><span class="dv">—</span></div>' +
-    '</button>' +
-    '<div class="memo"><textarea rows="2" placeholder="메모 (지각 사유, 조퇴 등)"></textarea>' +
-      '<button class="undo" type="button" title="이 사람 기록 되돌리기" aria-label="' + name + ' 기록 되돌리기">↺</button></div>';
+  /* 자정이 지나도 아직 근무 중인 사람이 있으면 그 날짜를 계속 열어 둔다 */
+  useEffect(() => {
+    const tk = todayKey();
+    if(activeKey === tk) return;
+    const stillOpen = STAFF.some(n => { const r = getRec(db, activeKey, n); return r.in && !r.out; });
+    if(!stillOpen){
+      setViewKey(v => (v === activeKey ? tk : v));
+      setActiveKey(tk);
+    }
+  }, [now, db, activeKey]);
 
-  grid.appendChild(card);
-  cardMap[name] = {
-    el: card,
-    pill: card.querySelector(".pill"),
-    inV: card.querySelectorAll(".stamp .vl")[0],
-    outV: card.querySelectorAll(".stamp .vl")[1],
-    durV: card.querySelector(".dv"),
-    memo: card.querySelector("textarea"),
-    punch: card.querySelector(".punch"),
-    undo: card.querySelector(".undo")
+  const persist = useCallback(next => {
+    setDb(next);
+    try{ localStorage.setItem(KEY, JSON.stringify(next)); }
+    catch(e){ say("저장 공간에 쓸 수 없어 이번 기록이 남지 않았습니다"); }
+  }, []);
+
+  function say(msg){
+    setToast(msg);
+    clearTimeout(toastT.current);
+    toastT.current = setTimeout(() => setToast(""), 2600);
+  }
+
+  const locked = viewKey !== todayKey() && viewKey !== activeKey;
+  const carryOver = activeKey !== todayKey();
+  const carryCount = STAFF.filter(n => { const r = getRec(db, activeKey, n); return r.in && !r.out; }).length;
+  const write = (name, patch) => {
+    const day = { ...(db[viewKey] || {}) };
+    day[name] = { ...getRec(db, viewKey, name), ...patch };
+    persist({ ...db, [viewKey]: day });
   };
 
-  cardMap[name].punch.addEventListener("click", function(){ onPunch(name); });
-  cardMap[name].undo.addEventListener("click", function(e){ e.stopPropagation(); onUndo(name); });
-  cardMap[name].memo.addEventListener("input", function(){
-    if(isLocked()) return;
-    rec(viewKey, name).memo = this.value;
-    save();
-    renderTable();
-  });
-});
+  function punch(name){
+    if(locked){ say("지난 날짜는 조회만 가능합니다"); return; }
+    const r = getRec(db, viewKey, name);
+    const st = stateOf(r);
 
-/* ── actions ──────────────────────────── */
-function onPunch(name){
-  if(isLocked()){ toast("지난 날짜는 조회만 가능합니다"); return; }
-  var r = rec(viewKey, name);
-  var st = stateOf(r);
-
-  if(st === "idle"){
-    r.in = Date.now();
-    save(); render();
-    toast(name + " 출근 " + hhmm(r.in));
-  } else if(st === "work"){
-    var now = Date.now();
-    confirmModal(
-      name + " 퇴근",
-      '<p><b>' + hhmm(r.in) + '</b> 출근 → 지금 <b>' + hhmm(now) + '</b> 퇴근으로 기록합니다.<br>' +
-      '오늘 근무시간 <span class="big">' + durPlain(now - r.in) + '</span></p>',
-      "퇴근 체크",
-      function(){
-        r.out = Date.now();
-        save(); render();
-        toast(name + " 퇴근 " + hhmm(r.out) + " · " + durPlain(r.out - r.in));
-      }
-    );
-  } else {
-    toast(name + " 오늘 근무 " + durPlain(r.out - r.in) + " (완료)");
-  }
-}
-
-function onUndo(name){
-  if(isLocked()) return;
-  confirmModal(
-    name + " 기록 되돌리기",
-    "<p>이 날짜의 <b>출근·퇴근 시각</b>을 지웁니다. 메모는 남습니다.</p>",
-    "되돌리기",
-    function(){
-      var r = rec(viewKey, name);
-      r.in = null; r.out = null;
-      save(); render();
-      toast(name + " 기록을 되돌렸습니다");
-    }
-  );
-}
-
-/* ── render ───────────────────────────── */
-function render(){
-  var locked = isLocked();
-  document.getElementById("dateline").textContent = prettyDate(viewKey) + (locked ? "" : " · 오늘");
-  document.getElementById("datePick").value = viewKey;
-  document.getElementById("lockbar").classList.toggle("on", locked);
-  document.getElementById("nextDay").disabled = (viewKey >= todayKey());
-
-  var nW=0, nD=0, nI=0;
-  STAFF.forEach(function(name){
-    var c = cardMap[name], r = rec(viewKey, name), st = stateOf(r);
-    c.el.className = "card s-" + st + (locked ? " locked" : "");
-    c.punch.disabled = false;
-
-    if(st === "idle"){ nI++; c.pill.textContent = "미출근"; }
-    if(st === "work"){ nW++; c.pill.textContent = "근무중"; }
-    if(st === "done"){ nD++; c.pill.textContent = "퇴근완료"; }
-
-    c.inV.textContent = r.in ? hhmm(r.in) : "--:--";
-    c.inV.className = "vl" + (r.in ? "" : " off");
-    c.outV.textContent = r.out ? hhmm(r.out) : "--:--";
-    c.outV.className = "vl" + (r.out ? "" : " off");
-
-    if(st === "idle") c.durV.innerHTML = "—";
-    else if(st === "work") c.durV.innerHTML = durText(Date.now() - r.in);
-    else c.durV.innerHTML = durText(r.out - r.in);
-
-    if(document.activeElement !== c.memo) c.memo.value = r.memo || "";
-    c.memo.readOnly = locked;
-    c.memo.placeholder = locked ? "" : "메모 (지각 사유, 조퇴 등)";
-  });
-
-  document.getElementById("cWork").textContent = nW;
-  document.getElementById("cDone").textContent = nD;
-  document.getElementById("cIdle").textContent = nI;
-
-  renderTable();
-}
-
-function renderTable(){
-  var tb = document.getElementById("tbody");
-  var html = "", total = 0;
-  STAFF.forEach(function(name){
-    var r = rec(viewKey, name), st = stateOf(r), dur = "—";
-    if(st === "work") dur = durPlain(Date.now() - r.in) + " (진행중)";
-    if(st === "done"){ dur = durPlain(r.out - r.in); total += (r.out - r.in); }
-    html += '<tr class="r-' + st + '">' +
-      '<td><span class="dot"></span>' + name + '</td>' +
-      '<td class="t">' + (r.in ? hhmm(r.in) : "—") + '</td>' +
-      '<td class="t">' + (r.out ? hhmm(r.out) : "—") + '</td>' +
-      '<td class="t">' + dur + '</td>' +
-      '<td class="memo-c">' + esc(r.memo || "") + '</td></tr>';
-  });
-  tb.innerHTML = html;
-  document.getElementById("totalDur").textContent = total ? durPlain(total) : "—";
-}
-
-function esc(s){
-  return String(s).replace(/[&<>"]/g, function(c){
-    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
-  });
-}
-
-/* ── clock ────────────────────────────── */
-var lastToday = todayKey();
-function tick(){
-  var d = new Date();
-  document.getElementById("clock").textContent =
-    String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
-  document.getElementById("clocksec").textContent = ":" + String(d.getSeconds()).padStart(2,"0");
-
-  if(todayKey() !== lastToday){
-    lastToday = todayKey();
-    viewKey = lastToday;
-    render();
-    return;
-  }
-  if(d.getSeconds() === 0) render();
-}
-
-/* ── date nav ─────────────────────────── */
-function shift(n){
-  var d = parseKey(viewKey);
-  d.setDate(d.getDate() + n);
-  if(ymd(d) > todayKey()) return;
-  viewKey = ymd(d);
-  render();
-}
-document.getElementById("prevDay").addEventListener("click", function(){ shift(-1); });
-document.getElementById("nextDay").addEventListener("click", function(){ shift(1); });
-document.getElementById("todayBtn").addEventListener("click", function(){ viewKey = todayKey(); render(); });
-document.getElementById("datePick").addEventListener("change", function(){
-  if(!this.value) return;
-  if(this.value > todayKey()){ toast("미래 날짜는 볼 수 없습니다"); this.value = viewKey; return; }
-  viewKey = this.value; render();
-});
-
-/* ── modal ────────────────────────────── */
-var scrim = document.getElementById("scrim"), modal = document.getElementById("modal");
-var lastFocus = null;
-
-function openModal(html, wide){
-  lastFocus = document.activeElement;
-  modal.className = "modal" + (wide ? " wide" : "");
-  modal.innerHTML = html;
-  scrim.classList.add("on");
-  var f = modal.querySelector("button");
-  if(f) f.focus();
-}
-function closeModal(){
-  scrim.classList.remove("on");
-  modal.innerHTML = "";
-  if(lastFocus && lastFocus.focus) lastFocus.focus();
-}
-scrim.addEventListener("click", function(e){ if(e.target === scrim) closeModal(); });
-document.addEventListener("keydown", function(e){ if(e.key === "Escape" && scrim.classList.contains("on")) closeModal(); });
-
-function confirmModal(title, bodyHtml, okText, onOk){
-  openModal(
-    "<h3>" + esc(title) + "</h3>" + bodyHtml +
-    '<div class="mrow"><button class="btn" data-x>취소</button>' +
-    '<button class="btn pri" data-ok>' + esc(okText) + "</button></div>"
-  );
-  modal.querySelector("[data-x]").addEventListener("click", closeModal);
-  var ok = modal.querySelector("[data-ok]");
-  ok.addEventListener("click", function(){ closeModal(); onOk(); });
-  ok.focus();
-}
-
-/* ── CSV ──────────────────────────────── */
-function csvCell(v){
-  v = String(v == null ? "" : v);
-  return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
-}
-function buildCSV(keys){
-  var rows = [["날짜","이름","출근","퇴근","근무시간(분)","근무시간","메모"]];
-  keys.sort().forEach(function(k){
-    STAFF.forEach(function(name){
-      var d = DB[k] || {}, r = d[name];
-      if(!r || (!r.in && !r.out && !r.memo)) return;
-      var mins = (r.in && r.out) ? Math.floor((r.out - r.in)/60000) : "";
-      rows.push([k, name, r.in ? hhmm(r.in) : "", r.out ? hhmm(r.out) : "",
-                 mins, mins === "" ? "" : durPlain(r.out - r.in), r.memo || ""]);
-    });
-  });
-  return rows.map(function(r){ return r.map(csvCell).join(","); }).join("\n");
-}
-function csvModal(title, text){
-  if(!text || text.indexOf("\n") === -1){
-    toast("내보낼 기록이 없습니다"); return;
-  }
-  openModal(
-    "<h3>" + esc(title) + "</h3>" +
-    "<p>아래 내용을 복사해 엑셀이나 구글 시트에 붙여넣으세요.</p>" +
-    '<textarea class="csv" readonly>' + esc(text) + "</textarea>" +
-    '<div class="mrow"><button class="btn" data-x>닫기</button>' +
-    '<button class="btn pri" data-c>복사하기</button></div>', true
-  );
-  modal.querySelector("[data-x]").addEventListener("click", closeModal);
-  modal.querySelector("[data-c]").addEventListener("click", function(){
-    var ta = modal.querySelector("textarea");
-    ta.focus(); ta.select();
-    var done = false;
-    try{ done = document.execCommand("copy"); }catch(e){}
-    if(!done && navigator.clipboard){
-      navigator.clipboard.writeText(text).then(function(){ toast("복사했습니다"); },
-        function(){ toast("복사 실패 — 직접 선택해 복사해 주세요"); });
+    if(st === "idle"){
+      const t = Date.now();
+      write(name, { in:t });
+      setFlash(name); setTimeout(() => setFlash(null), 500);
+      say(`${name} 출근 ${hhmm(t)}`);
       return;
     }
-    toast(done ? "복사했습니다" : "복사 실패 — 직접 선택해 복사해 주세요");
-  });
+    if(st === "work"){
+      const t = Date.now();
+      setModal({
+        title: `${name} 퇴근`,
+        body: (
+          <div>
+            <p><b className="num font-semibold text-ink">{hhmm(r.in)}</b> 출근 → 지금 <b className="num font-semibold text-ink">{hhmm(t)}</b> 로 퇴근 도장을 찍습니다.</p>
+            <p className="mt-4 text-muted text-[11px] num font-semibold tracking-[.18em]">TODAY</p>
+            <p className="han text-[34px] text-cobalt leading-none mt-1">{durPlain(t - r.in)}</p>
+          </div>
+        ),
+        okText: "퇴근 도장",
+        onOk: () => {
+          const o = Date.now();
+          write(name, { out:o });
+          setFlash(name); setTimeout(() => setFlash(null), 500);
+          say(`${name} 퇴근 ${hhmm(o)} · ${durPlain(o - r.in)}`);
+        }
+      });
+      return;
+    }
+    say(`${name} 오늘 근무 ${durPlain(r.out - r.in)} · 마감`);
+  }
+
+  function undo(name){
+    setModal({
+      title: `${name} 기록 되돌리기`,
+      body: <p>이 날짜의 <b className="text-ink font-semibold">출근·퇴근 시각</b>을 지웁니다. 메모는 그대로 남습니다.</p>,
+      okText: "되돌리기",
+      onOk: () => { write(name, { in:null, out:null }); say(`${name} 기록을 되돌렸습니다`); }
+    });
+  }
+
+  function shift(n){
+    const d = parseKey(viewKey); d.setDate(d.getDate() + n);
+    if(ymd(d) > todayKey()) return;
+    setViewKey(ymd(d));
+  }
+
+  /* CSV */
+  const csvCell = v => { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  function buildCSV(keys){
+    const rows = [["날짜","이름","출근","퇴근","근무시간(분)","근무시간","메모"]];
+    keys.slice().sort().forEach(k => STAFF.forEach(n => {
+      const r = (db[k] || {})[n];
+      if(!r || (!r.in && !r.out && !r.memo)) return;
+      const mins = (r.in && r.out) ? Math.floor((r.out - r.in)/60000) : "";
+      rows.push([k, n, r.in?hhmm(r.in):"", r.out?hhmm(r.out):"", mins, mins===""?"":durPlain(r.out-r.in), r.memo||""]);
+    }));
+    return rows.map(r => r.map(csvCell).join(",")).join("\n");
+  }
+  function openCSV(title, keys){
+    const text = buildCSV(keys);
+    if(text.indexOf("\n") === -1){ say("내보낼 기록이 없습니다"); return; }
+    setModal({
+      title, wide:true, cancelText:"닫기", okText:"복사하기",
+      body: (
+        <div>
+          <p className="mb-3">아래 내용을 복사해 엑셀이나 구글 시트에 붙여넣으세요.</p>
+          <textarea id="csvbox" readOnly value={text}
+            className="w-full h-[240px] rounded-xl border border-line bg-paper/70 p-3.5 num text-[11.5px] leading-relaxed text-ink resize-y" />
+        </div>
+      ),
+      onOk: () => {
+        const ta = document.getElementById("csvbox");
+        let ok = false;
+        try{ if(ta){ ta.focus(); ta.select(); ok = document.execCommand("copy"); } }catch(e){}
+        if(!ok && navigator.clipboard){
+          navigator.clipboard.writeText(text).then(() => say("복사했습니다"), () => say("복사 실패 — 직접 선택해 복사해 주세요"));
+          return;
+        }
+        say(ok ? "복사했습니다" : "복사 실패 — 직접 선택해 복사해 주세요");
+      }
+    });
+  }
+
+  /* 집계 */
+  const rows = STAFF.map(n => { const r = getRec(db, viewKey, n); return { name:n, r, st:stateOf(r) }; });
+  const nWork = rows.filter(x => x.st === "work").length;
+  const nDone = rows.filter(x => x.st === "done").length;
+  const nIdle = rows.filter(x => x.st === "idle").length;
+  const totalMs = rows.reduce((s,x) => s + (x.st === "done" ? x.r.out - x.r.in : 0), 0);
+
+  const clock = new Date(now);
+
+  return (
+    <div className="min-h-screen">
+      {/* ── 헤더 ── */}
+      <header className="border-b border-line">
+        <div className="mx-auto max-w-[1160px] px-6 pt-9 pb-7">
+          <div className="flex items-end gap-6 flex-wrap">
+            <div className="min-w-0">
+              <div className="num text-[10px] font-bold tracking-[.28em] text-cobalt">CASAPE · ATTENDANCE</div>
+              <h1 className="han text-[40px] sm:text-[52px] leading-[0.95] tracking-tight mt-2.5 text-ink">
+                {locked ? "지난 기록" : (viewKey !== todayKey() ? "어제의 마무리" : "오늘의 도장")}
+              </h1>
+              <p className="mt-2.5 text-[14px] text-ink2">
+                <span className="num font-semibold">{yearOf(viewKey)}</span> · {prettyDate(viewKey)}
+                {!locked && <span className="ml-2 text-muted">— 이름을 누르면 도장이 찍힙니다</span>}
+              </p>
+            </div>
+
+            <div className="ml-auto text-right">
+              <div className="num text-[10px] font-bold tracking-[.28em] text-muted mb-1">현재 시각</div>
+              <div className="num font-bold text-ink leading-none tracking-[-.03em] text-[58px] sm:text-[76px]">
+                {pad(clock.getHours())}<span className="text-gold2 mx-[2px]">:</span>{pad(clock.getMinutes())}
+                <span className="text-[24px] sm:text-[30px] text-muted font-semibold ml-1.5">{pad(clock.getSeconds())}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 집계 칩 */}
+          <div className="mt-7 flex flex-wrap gap-2.5">
+            {[["근무중",nWork,"work"],["퇴근",nDone,"done"],["미출근",nIdle,"idle"]].map(([lb,v,k]) => (
+              <div key={k} className={`flex items-baseline gap-2.5 rounded-full border px-4 py-2
+                ${k==="work" ? "border-gold2/45 bg-goldSoft/55" : k==="done" ? "border-cobalt2/35 bg-cobaltSoft/60" : "border-line bg-paper2/50"}`}>
+                <span className={`num text-[21px] font-bold leading-none ${TONE[k].ink}`}>{v}</span>
+                <span className="text-[12px] text-ink2">{lb}</span>
+              </div>
+            ))}
+            {carryOver && (
+              <button onClick={() => setViewKey(activeKey)}
+                className="flex items-center gap-2.5 rounded-full border border-gold2/50 bg-goldSoft/70 px-4 py-2 hover:border-gold transition-colors">
+                <span className="w-[6px] h-[6px] rounded-full bg-gold2 pulse-dot"></span>
+                <span className="text-[12px] text-gold font-medium">
+                  {prettyDate(activeKey)} 미퇴근 <span className="num font-bold">{carryCount}</span>명
+                </span>
+              </button>
+            )}
+            <div className="ml-auto max-sm:ml-0 max-sm:w-full flex items-center gap-1.5 flex-wrap">
+              <button onClick={() => shift(-1)}
+                className="whitespace-nowrap rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] font-medium text-ink2 hover:border-cobalt hover:text-cobalt transition-colors">◀ 이전날</button>
+              <input type="date" value={viewKey} max={todayKey()}
+                onChange={e => { if(e.target.value) setViewKey(e.target.value); }}
+                className="num whitespace-nowrap rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] text-ink" />
+              <button onClick={() => shift(1)} disabled={viewKey >= todayKey()}
+                className="whitespace-nowrap rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] font-medium text-ink2 enabled:hover:border-cobalt enabled:hover:text-cobalt disabled:opacity-35 transition-colors">다음날 ▶</button>
+              <button onClick={() => setViewKey(todayKey())}
+                className="whitespace-nowrap rounded-full bg-ink px-4 py-2 text-[12.5px] font-semibold text-paper hover:bg-cobalt transition-colors">오늘</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ── 마키 ── */}
+      <div className="border-b border-line bg-paper2/40 overflow-hidden">
+        <div className="marq flex whitespace-nowrap py-2.5 w-max">
+          {[0,1].map(i => (
+            <div key={i} className="flex shrink-0">
+              {["이름을 누르면 출근","한 번 더 누르면 퇴근","늦으면 메모칸에 사유를","기록은 이 기기에 자동 저장","지난 날짜는 조회 전용"].map((t,j) => (
+                <span key={j} className="num text-[10.5px] font-semibold tracking-[.22em] text-muted px-7">{t} ·</span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <main className="mx-auto max-w-[1160px] px-6 pb-24">
+        {!locked && viewKey !== todayKey() && (
+          <div className="mt-7 flex items-center gap-3 rounded-2xl border border-gold2/45 bg-goldSoft/60 px-5 py-3.5 text-[13px] text-gold">
+            <span className="num text-[10px] font-bold tracking-[.2em] shrink-0">CARRY OVER</span>
+            <span>자정을 넘겼지만 아직 근무 중인 인원이 있어 이 날짜를 열어 두었습니다. 여기서 퇴근 도장을 찍으세요.</span>
+          </div>
+        )}
+        {locked && (
+          <div className="mt-7 flex items-center gap-3 rounded-2xl border border-cobalt2/35 bg-cobaltSoft/55 px-5 py-3.5 text-[13px] text-cobalt">
+            <span className="num text-[10px] font-bold tracking-[.2em] shrink-0">READ ONLY</span>
+            <span>지난 날짜를 보고 있습니다. 도장을 찍으려면 <b>오늘</b>로 돌아가세요.</span>
+          </div>
+        )}
+
+        {/* ── 카드 ── */}
+        <section className="mt-8 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]">
+          {rows.map(({name, r}) => (
+            <Card key={name} name={name} rec={r} locked={locked} now={now}
+              flash={flash === name}
+              onPunch={() => punch(name)}
+              onMemo={v => { if(!locked) write(name, { memo:v }); }}
+              onUndo={() => undo(name)} />
+          ))}
+        </section>
+
+        {/* ── 요약 ── */}
+        <section className="reveal mt-16">
+          <div className="flex items-center gap-4 mb-5">
+            <h2 className="han text-[24px] text-ink leading-none">근무 요약</h2>
+            <div className="h-px flex-1 bg-line"></div>
+            <button onClick={() => openCSV(prettyDate(viewKey) + " CSV", [viewKey])}
+              className="rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] font-medium text-ink2 hover:border-cobalt hover:text-cobalt transition-colors">이 날짜 CSV</button>
+            <button onClick={() => openCSV("전체 기록 CSV", Object.keys(db))}
+              className="rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] font-medium text-ink2 hover:border-cobalt hover:text-cobalt transition-colors">전체 CSV</button>
+          </div>
+
+          <div className="rounded-[20px] border border-line bg-card overflow-x-auto shadow-[0_16px_36px_-30px_rgba(36,28,21,.5)]">
+            <table className="w-full min-w-[600px] text-[13.5px]">
+              <thead>
+                <tr className="bg-paper/70">
+                  {["이름","출근","퇴근","근무시간","메모"].map(h => (
+                    <th key={h} className="num text-left text-[9.5px] font-bold tracking-[.2em] text-muted px-5 py-3.5 border-b border-line">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(({name, r, st}) => (
+                  <tr key={name} className="border-b border-line2 last:border-0 hover:bg-paper/50 transition-colors">
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <span className={`inline-block w-[7px] h-[7px] rounded-full mr-2.5 align-middle ${TONE[st].bar} ${st==="idle" ? "opacity-45" : ""}`}></span>
+                      <span className="font-semibold text-ink">{name}</span>
+                    </td>
+                    <td className="num px-5 py-3.5 whitespace-nowrap text-ink2">{r.in ? hhmm(r.in) : "—"}</td>
+                    <td className="num px-5 py-3.5 whitespace-nowrap text-ink2">{r.out ? hhmm(r.out) : "—"}</td>
+                    <td className={`px-5 py-3.5 whitespace-nowrap font-semibold ${st==="idle" ? "text-line" : TONE[st].ink}`}>
+                      {st==="idle" ? "—" : durPlain(st==="work" ? now - r.in : r.out - r.in)}
+                      {st==="work" && <span className="ml-1.5 text-[11px] font-medium text-muted">진행중</span>}
+                    </td>
+                    <td className="px-5 py-3.5 text-[12.5px] text-ink2 max-w-[300px]">{r.memo || ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-paper/70 border-t border-line">
+                  <td className="px-5 py-4 font-bold text-ink">합계</td>
+                  <td className="px-5 py-4"></td>
+                  <td className="px-5 py-4"></td>
+                  <td className="px-5 py-4 font-bold text-cobalt whitespace-nowrap">{totalMs ? durPlain(totalMs) : "—"}</td>
+                  <td className="px-5 py-4 text-[12px] text-muted whitespace-nowrap">퇴근 완료 기준</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <p className="mt-6 text-[11.5px] leading-relaxed text-muted">
+            기록은 이 기기의 브라우저에 자동 저장됩니다. 다른 기기에서는 보이지 않으며, 브라우저 데이터를 지우면 함께 삭제됩니다.<br />
+            메모칸 오른쪽 ↺ 는 그 사람의 그날 출퇴근 시각을 처음으로 되돌립니다.
+          </p>
+        </section>
+      </main>
+
+      <Modal data={modal} onClose={() => setModal(null)} />
+
+      <div className={`fixed left-1/2 bottom-7 z-[60] -translate-x-1/2 rounded-full bg-ink px-5 py-3 text-[13px] font-medium text-paper
+                       shadow-[0_18px_36px_-16px_rgba(36,28,21,.7)] transition-all duration-200
+                       ${toast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"}`}>
+        {toast}
+      </div>
+    </div>
+  );
 }
-document.getElementById("csvDay").addEventListener("click", function(){
-  csvModal(prettyDate(viewKey) + " CSV", buildCSV([viewKey]));
-});
-document.getElementById("csvAll").addEventListener("click", function(){
-  csvModal("전체 기록 CSV", buildCSV(Object.keys(DB)));
-});
 
-/* ── toast ────────────────────────────── */
-var toastEl = document.getElementById("toast"), toastT = null;
-function toast(msg){
-  toastEl.textContent = msg;
-  toastEl.classList.add("on");
-  clearTimeout(toastT);
-  toastT = setTimeout(function(){ toastEl.classList.remove("on"); }, 2400);
-}
-
-/* ── go ───────────────────────────────── */
-load();
-render();
-tick();
-setInterval(tick, 1000);
-
-window.__att = { DB:function(){return DB;}, view:function(){return viewKey;}, punch:onPunch, render:render, key:KEY };
-})();
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
+
 </body>
 </html>
-
