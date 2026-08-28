@@ -1,1 +1,684 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E6B58">
+<title>출퇴근 체크 보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap">
+<style>
+:root{
+  --paper:#E9EDE9; --card:#FDFDFC; --card-2:#F4F6F3;
+  --ink:#14201C; --ink-2:#46554F; --muted:#7C8B84;
+  --line:#D3DAD4; --line-2:#E4E9E4;
+  --accent:#0E6B58; --accent-ink:#0B5647; --accent-soft:#DEEDE7;
+  --done:#2A5C93; --done-soft:#E1EBF5;
+  --idle:#9AA69F; --idle-soft:#EDEFEC;
+  --warn:#A8631F;
+  --shadow:0 1px 2px rgba(20,32,28,.05), 0 8px 24px -12px rgba(20,32,28,.18);
+  --r:14px;
+}
+:root:not([data-theme="light"]) { color-scheme: light; }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --paper:#0F1513; --card:#19211E; --card-2:#141B19;
+    --ink:#E9EEEB; --ink-2:#AFBDB6; --muted:#78877F;
+    --line:#2B3733; --line-2:#222C29;
+    --accent:#4CC3A4; --accent-ink:#8FE0C9; --accent-soft:#123028;
+    --done:#84B4E4; --done-soft:#152840;
+    --idle:#6C7A73; --idle-soft:#1D2624;
+    --warn:#D79B4E;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --paper:#0F1513; --card:#19211E; --card-2:#141B19;
+  --ink:#E9EEEB; --ink-2:#AFBDB6; --muted:#78877F;
+  --line:#2B3733; --line-2:#222C29;
+  --accent:#4CC3A4; --accent-ink:#8FE0C9; --accent-soft:#123028;
+  --done:#84B4E4; --done-soft:#152840;
+  --idle:#6C7A73; --idle-soft:#1D2624;
+  --warn:#D79B4E;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  font-weight:400;
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+  padding:0 0 48px;
+}
+.mono{font-family:"IBM Plex Mono","SFMono-Regular",Menlo,monospace;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+/* ── header ───────────────────────────── */
+header{
+  position:sticky;top:0;z-index:20;
+  background:color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.hbar{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:14px 0 13px}
+.brand{display:flex;flex-direction:column;gap:3px;margin-right:auto}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;
+  letter-spacing:.16em;color:var(--muted);text-transform:uppercase;
+}
+.dateline{font-size:17px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+.clock{
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:34px;font-weight:500;letter-spacing:-.02em;line-height:1;
+  color:var(--ink);
+}
+.clock .sec{font-size:20px;color:var(--muted);margin-left:2px}
+.tally{display:flex;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+.tally div{padding:7px 14px;display:flex;flex-direction:column;gap:2px;min-width:64px;border-right:1px solid var(--line-2)}
+.tally div:last-child{border-right:0}
+.tally b{font-family:"IBM Plex Mono",monospace;font-size:19px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.tally span{font-size:10.5px;color:var(--muted);letter-spacing:.02em}
+.t-work b{color:var(--accent)} .t-done b{color:var(--done)} .t-idle b{color:var(--muted)}
+
+/* ── date nav ─────────────────────────── */
+.datenav{display:flex;align-items:center;gap:8px;padding:0 0 14px;flex-wrap:wrap}
+.nbtn{
+  border:1px solid var(--line);background:var(--card);border-radius:9px;
+  padding:7px 12px;font-size:13px;font-weight:500;color:var(--ink-2);
+  transition:border-color .12s, color .12s;
+}
+.nbtn:hover{border-color:var(--accent);color:var(--accent)}
+.nbtn[disabled]{opacity:.35;cursor:default}
+.nbtn[disabled]:hover{border-color:var(--line);color:var(--ink-2)}
+input[type=date]{
+  border:1px solid var(--line);background:var(--card);color:var(--ink);
+  border-radius:9px;padding:7px 10px;font-family:"IBM Plex Mono",monospace;font-size:13px;
+}
+.spacer{margin-left:auto}
+.lockbar{
+  display:none;align-items:center;gap:9px;
+  background:var(--done-soft);border:1px solid var(--line);border-radius:10px;
+  padding:9px 13px;font-size:13px;color:var(--done);margin-bottom:14px;
+}
+.lockbar.on{display:flex}
+
+/* ── cards ────────────────────────────── */
+.grid{
+  display:grid;gap:14px;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  padding-top:2px;
+}
+.card{
+  position:relative;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow);overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--idle)}
+.card.s-work::before{background:var(--accent)}
+.card.s-done::before{background:var(--done)}
+
+.punch{
+  display:block;width:100%;text-align:left;
+  padding:16px 16px 14px 19px;
+  transition:background .12s;
+}
+.punch:hover{background:var(--card-2)}
+.punch:active{background:var(--accent-soft)}
+.card.locked .punch{cursor:default}
+.card.locked .punch:hover,.card.locked .punch:active{background:none}
+
+.nameline{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+.nm{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1}
+.pill{
+  margin-left:auto;font-size:11px;font-weight:500;letter-spacing:.03em;
+  padding:4px 9px;border-radius:999px;white-space:nowrap;
+  background:var(--idle-soft);color:var(--muted);
+}
+.card.s-work .pill{background:var(--accent-soft);color:var(--accent-ink)}
+.card.s-done .pill{background:var(--done-soft);color:var(--done)}
+
+.stamps{display:flex;gap:16px;margin-bottom:12px}
+.stamp{display:flex;flex-direction:column;gap:3px;min-width:58px}
+.stamp .lb{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.13em;color:var(--muted)}
+.stamp .vl{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.1}
+.stamp .vl.off{color:var(--idle);font-weight:400}
+
+.dur{
+  display:flex;align-items:baseline;gap:7px;
+  padding-top:11px;border-top:1px dashed var(--line-2);
+}
+.dur .dl{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.13em;color:var(--muted)}
+.dur .dv{font-size:16px;font-weight:600;margin-left:auto;letter-spacing:-.01em}
+.card.s-idle .dur .dv{color:var(--idle);font-weight:400}
+.card.s-work .dur .dv{color:var(--accent)}
+.card.s-done .dur .dv{color:var(--done)}
+.dur .dv .u{font-size:12px;font-weight:400;color:var(--muted);margin:0 1px 0 1px}
+
+.memo{border-top:1px solid var(--line-2);background:var(--card-2);display:flex;align-items:stretch}
+.memo textarea{
+  display:block;flex:1;min-width:0;border:0;background:none;resize:none;
+  font-family:inherit;font-size:12.5px;line-height:1.5;color:var(--ink-2);
+  padding:10px 14px 11px 19px;min-height:56px;
+}
+.memo textarea::placeholder{color:var(--muted);opacity:.85}
+.memo textarea:focus{outline:none;background:var(--card);color:var(--ink)}
+.memo textarea[readonly]{cursor:default}
+
+.undo{
+  flex:0 0 auto;width:38px;
+  display:none;align-items:center;justify-content:center;
+  color:var(--muted);font-size:15px;line-height:1;
+  border-left:1px solid var(--line-2);
+  transition:color .12s,background .12s;
+}
+.card.s-work .undo,.card.s-done .undo{display:flex}
+.card.locked .undo{display:none}
+.undo:hover{color:var(--warn);background:var(--card)}
+
+/* ── summary ──────────────────────────── */
+.sec-h{
+  display:flex;align-items:center;gap:12px;margin:34px 0 12px;
+}
+.sec-h h2{font-size:14px;font-weight:600;letter-spacing:.01em;margin:0}
+.sec-h .rule{flex:1;height:1px;background:var(--line)}
+.tools{display:flex;gap:8px}
+
+.tablewrap{
+  overflow-x:auto;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);
+}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:13.5px}
+th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line-2);white-space:nowrap}
+th{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:500;
+  letter-spacing:.13em;color:var(--muted);background:var(--card-2);
+}
+tbody tr:last-child td{border-bottom:0}
+td.t{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+td.memo-c{white-space:normal;color:var(--ink-2);font-size:12.5px;max-width:280px}
+td .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--idle)}
+tr.r-work .dot{background:var(--accent)} tr.r-done .dot{background:var(--done)}
+tfoot td{background:var(--card-2);font-weight:600;border-top:1px solid var(--line)}
+
+/* ── modal ────────────────────────────── */
+.scrim{
+  position:fixed;inset:0;z-index:50;display:none;
+  align-items:center;justify-content:center;padding:20px;
+  background:rgba(10,18,16,.42);backdrop-filter:blur(3px);
+}
+.scrim.on{display:flex}
+.modal{
+  background:var(--card);border:1px solid var(--line);border-radius:16px;
+  box-shadow:0 24px 60px -20px rgba(0,0,0,.5);
+  width:100%;max-width:400px;padding:24px;
+  animation:pop .16s ease-out;
+}
+.modal.wide{max-width:620px}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.modal{animation:none}*{transition:none!important}}
+.modal h3{margin:0 0 8px;font-size:19px;font-weight:600;letter-spacing:-.01em}
+.modal p{margin:0 0 20px;font-size:13.5px;line-height:1.65;color:var(--ink-2)}
+.modal p b{color:var(--ink);font-weight:600}
+.modal .big{
+  font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:500;
+  color:var(--accent);letter-spacing:-.02em;
+}
+.mrow{display:flex;gap:9px;justify-content:flex-end}
+.btn{
+  border-radius:10px;padding:10px 17px;font-size:13.5px;font-weight:500;
+  border:1px solid var(--line);background:var(--card);color:var(--ink-2);
+}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{filter:brightness(1.08)}
+.modal textarea.csv{
+  width:100%;height:230px;border:1px solid var(--line);border-radius:10px;
+  background:var(--card-2);color:var(--ink);padding:12px;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.6;resize:vertical;
+  margin-bottom:16px;
+}
+
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(14px);
+  background:var(--ink);color:var(--paper);
+  padding:11px 19px;border-radius:999px;font-size:13px;font-weight:500;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+footer{margin-top:34px;font-size:11.5px;color:var(--muted);line-height:1.7}
+
+@media (max-width:640px){
+  .wrap{padding:0 14px}
+  .clock{font-size:28px}
+  .hbar{gap:12px}
+  .tally{width:100%}
+  .tally div{flex:1;min-width:0}
+  .grid{grid-template-columns:1fr 1fr;gap:10px}
+  .nm{font-size:20px}
+  .punch{padding:13px 12px 12px 16px}
+  .stamps{gap:12px}
+}
+@media (max-width:400px){ .grid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap hbar">
+    <div class="brand">
+      <div class="eyebrow">CASAPE · ATTENDANCE</div>
+      <div class="dateline" id="dateline">—</div>
+    </div>
+    <div class="clock mono"><span id="clock">--:--</span><span class="sec" id="clocksec">:--</span></div>
+    <div class="tally">
+      <div class="t-work"><b id="cWork">0</b><span>근무중</span></div>
+      <div class="t-done"><b id="cDone">0</b><span>퇴근</span></div>
+      <div class="t-idle"><b id="cIdle">0</b><span>미출근</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="datenav">
+    <button class="nbtn" id="prevDay">◀ 이전날</button>
+    <input type="date" id="datePick">
+    <button class="nbtn" id="nextDay">다음날 ▶</button>
+    <button class="nbtn" id="todayBtn">오늘</button>
+  </div>
+
+  <div class="lockbar" id="lockbar">
+    <span>지난 날짜 기록을 보고 있습니다 — 조회 전용입니다. 체크하려면 <b>오늘</b>로 돌아가세요.</span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="sec-h">
+    <h2>근무 요약</h2>
+    <div class="rule"></div>
+    <div class="tools">
+      <button class="nbtn" id="csvDay">이 날짜 CSV</button>
+      <button class="nbtn" id="csvAll">전체 CSV</button>
+    </div>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>이름</th><th>출근</th><th>퇴근</th><th>근무시간</th><th>메모</th></tr></thead>
+      <tbody id="tbody"></tbody>
+      <tfoot><tr><td>합계</td><td class="t">—</td><td class="t">—</td><td class="t" id="totalDur">—</td><td></td></tr></tfoot>
+    </table>
+  </div>
+
+  <footer>
+    기록은 이 기기의 브라우저에 자동 저장됩니다. 다른 기기에서는 보이지 않으며, 브라우저 데이터를 지우면 함께 삭제됩니다.<br>
+    카드를 한 번 누르면 출근, 다시 누르면 퇴근입니다. 메모칸 오른쪽 ↺ 는 그 사람의 그날 기록을 처음으로 되돌립니다.
+  </footer>
+</main>
+
+<div class="scrim" id="scrim">
+  <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+var STAFF = ["강민경","정유나","이다운","박시은","김민정","정예은","윤이나","장세빈","김가람"];
+var KEY = "casape-attendance-v1";
+var DAYS = ["일","월","화","수","목","금","토"];
+
+/* ── storage (safe) ───────────────────── */
+var DB = {};
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    DB = raw ? JSON.parse(raw) : {};
+    if(!DB || typeof DB !== "object") DB = {};
+  }catch(e){ DB = {}; }
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(DB)); }
+  catch(e){ toast("저장 공간에 쓸 수 없어 이번 기록이 남지 않았습니다"); }
+}
+
+/* ── date helpers ─────────────────────── */
+function ymd(d){
+  return d.getFullYear() + "-" +
+    String(d.getMonth()+1).padStart(2,"0") + "-" +
+    String(d.getDate()).padStart(2,"0");
+}
+function todayKey(){ return ymd(new Date()); }
+function parseKey(k){ var p = k.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+function prettyDate(k){
+  var d = parseKey(k);
+  return d.getFullYear() + "년 " + (d.getMonth()+1) + "월 " + d.getDate() + "일 (" + DAYS[d.getDay()] + ")";
+}
+function hhmm(ts){
+  var d = new Date(ts);
+  return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+}
+function durText(ms){
+  if(ms < 0) ms = 0;
+  var m = Math.floor(ms/60000), h = Math.floor(m/60);
+  m = m % 60;
+  if(h === 0) return m + '<span class="u">분</span>';
+  return h + '<span class="u">시간</span> ' + m + '<span class="u">분</span>';
+}
+function durPlain(ms){
+  if(ms < 0) ms = 0;
+  var m = Math.floor(ms/60000), h = Math.floor(m/60);
+  return h + "시간 " + (m%60) + "분";
+}
+
+/* ── record access ────────────────────── */
+var viewKey = todayKey();
+function day(k){ if(!DB[k]) DB[k] = {}; return DB[k]; }
+function rec(k, name){
+  var d = day(k);
+  if(!d[name]) d[name] = { in:null, out:null, memo:"" };
+  return d[name];
+}
+function stateOf(r){
+  if(!r.in) return "idle";
+  if(!r.out) return "work";
+  return "done";
+}
+function isLocked(){ return viewKey !== todayKey(); }
+
+/* ── build cards ──────────────────────── */
+var grid = document.getElementById("grid");
+var cardMap = {};
+
+STAFF.forEach(function(name){
+  var card = document.createElement("article");
+  card.className = "card";
+  card.innerHTML =
+    '<button class="punch" type="button">' +
+      '<div class="nameline"><span class="nm">' + name + '</span><span class="pill">미출근</span></div>' +
+      '<div class="stamps">' +
+        '<div class="stamp"><span class="lb">IN</span><span class="vl off">--:--</span></div>' +
+        '<div class="stamp"><span class="lb">OUT</span><span class="vl off">--:--</span></div>' +
+      '</div>' +
+      '<div class="dur"><span class="dl">TOTAL</span><span class="dv">—</span></div>' +
+    '</button>' +
+    '<div class="memo"><textarea rows="2" placeholder="메모 (지각 사유, 조퇴 등)"></textarea>' +
+      '<button class="undo" type="button" title="이 사람 기록 되돌리기" aria-label="' + name + ' 기록 되돌리기">↺</button></div>';
+
+  grid.appendChild(card);
+  cardMap[name] = {
+    el: card,
+    pill: card.querySelector(".pill"),
+    inV: card.querySelectorAll(".stamp .vl")[0],
+    outV: card.querySelectorAll(".stamp .vl")[1],
+    durV: card.querySelector(".dv"),
+    memo: card.querySelector("textarea"),
+    punch: card.querySelector(".punch"),
+    undo: card.querySelector(".undo")
+  };
+
+  cardMap[name].punch.addEventListener("click", function(){ onPunch(name); });
+  cardMap[name].undo.addEventListener("click", function(e){ e.stopPropagation(); onUndo(name); });
+  cardMap[name].memo.addEventListener("input", function(){
+    if(isLocked()) return;
+    rec(viewKey, name).memo = this.value;
+    save();
+    renderTable();
+  });
+});
+
+/* ── actions ──────────────────────────── */
+function onPunch(name){
+  if(isLocked()){ toast("지난 날짜는 조회만 가능합니다"); return; }
+  var r = rec(viewKey, name);
+  var st = stateOf(r);
+
+  if(st === "idle"){
+    r.in = Date.now();
+    save(); render();
+    toast(name + " 출근 " + hhmm(r.in));
+  } else if(st === "work"){
+    var now = Date.now();
+    confirmModal(
+      name + " 퇴근",
+      '<p><b>' + hhmm(r.in) + '</b> 출근 → 지금 <b>' + hhmm(now) + '</b> 퇴근으로 기록합니다.<br>' +
+      '오늘 근무시간 <span class="big">' + durPlain(now - r.in) + '</span></p>',
+      "퇴근 체크",
+      function(){
+        r.out = Date.now();
+        save(); render();
+        toast(name + " 퇴근 " + hhmm(r.out) + " · " + durPlain(r.out - r.in));
+      }
+    );
+  } else {
+    toast(name + " 오늘 근무 " + durPlain(r.out - r.in) + " (완료)");
+  }
+}
+
+function onUndo(name){
+  if(isLocked()) return;
+  confirmModal(
+    name + " 기록 되돌리기",
+    "<p>이 날짜의 <b>출근·퇴근 시각</b>을 지웁니다. 메모는 남습니다.</p>",
+    "되돌리기",
+    function(){
+      var r = rec(viewKey, name);
+      r.in = null; r.out = null;
+      save(); render();
+      toast(name + " 기록을 되돌렸습니다");
+    }
+  );
+}
+
+/* ── render ───────────────────────────── */
+function render(){
+  var locked = isLocked();
+  document.getElementById("dateline").textContent = prettyDate(viewKey) + (locked ? "" : " · 오늘");
+  document.getElementById("datePick").value = viewKey;
+  document.getElementById("lockbar").classList.toggle("on", locked);
+  document.getElementById("nextDay").disabled = (viewKey >= todayKey());
+
+  var nW=0, nD=0, nI=0;
+  STAFF.forEach(function(name){
+    var c = cardMap[name], r = rec(viewKey, name), st = stateOf(r);
+    c.el.className = "card s-" + st + (locked ? " locked" : "");
+    c.punch.disabled = false;
+
+    if(st === "idle"){ nI++; c.pill.textContent = "미출근"; }
+    if(st === "work"){ nW++; c.pill.textContent = "근무중"; }
+    if(st === "done"){ nD++; c.pill.textContent = "퇴근완료"; }
+
+    c.inV.textContent = r.in ? hhmm(r.in) : "--:--";
+    c.inV.className = "vl" + (r.in ? "" : " off");
+    c.outV.textContent = r.out ? hhmm(r.out) : "--:--";
+    c.outV.className = "vl" + (r.out ? "" : " off");
+
+    if(st === "idle") c.durV.innerHTML = "—";
+    else if(st === "work") c.durV.innerHTML = durText(Date.now() - r.in);
+    else c.durV.innerHTML = durText(r.out - r.in);
+
+    if(document.activeElement !== c.memo) c.memo.value = r.memo || "";
+    c.memo.readOnly = locked;
+    c.memo.placeholder = locked ? "" : "메모 (지각 사유, 조퇴 등)";
+  });
+
+  document.getElementById("cWork").textContent = nW;
+  document.getElementById("cDone").textContent = nD;
+  document.getElementById("cIdle").textContent = nI;
+
+  renderTable();
+}
+
+function renderTable(){
+  var tb = document.getElementById("tbody");
+  var html = "", total = 0;
+  STAFF.forEach(function(name){
+    var r = rec(viewKey, name), st = stateOf(r), dur = "—";
+    if(st === "work") dur = durPlain(Date.now() - r.in) + " (진행중)";
+    if(st === "done"){ dur = durPlain(r.out - r.in); total += (r.out - r.in); }
+    html += '<tr class="r-' + st + '">' +
+      '<td><span class="dot"></span>' + name + '</td>' +
+      '<td class="t">' + (r.in ? hhmm(r.in) : "—") + '</td>' +
+      '<td class="t">' + (r.out ? hhmm(r.out) : "—") + '</td>' +
+      '<td class="t">' + dur + '</td>' +
+      '<td class="memo-c">' + esc(r.memo || "") + '</td></tr>';
+  });
+  tb.innerHTML = html;
+  document.getElementById("totalDur").textContent = total ? durPlain(total) : "—";
+}
+
+function esc(s){
+  return String(s).replace(/[&<>"]/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
+  });
+}
+
+/* ── clock ────────────────────────────── */
+var lastToday = todayKey();
+function tick(){
+  var d = new Date();
+  document.getElementById("clock").textContent =
+    String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+  document.getElementById("clocksec").textContent = ":" + String(d.getSeconds()).padStart(2,"0");
+
+  if(todayKey() !== lastToday){
+    lastToday = todayKey();
+    viewKey = lastToday;
+    render();
+    return;
+  }
+  if(d.getSeconds() === 0) render();
+}
+
+/* ── date nav ─────────────────────────── */
+function shift(n){
+  var d = parseKey(viewKey);
+  d.setDate(d.getDate() + n);
+  if(ymd(d) > todayKey()) return;
+  viewKey = ymd(d);
+  render();
+}
+document.getElementById("prevDay").addEventListener("click", function(){ shift(-1); });
+document.getElementById("nextDay").addEventListener("click", function(){ shift(1); });
+document.getElementById("todayBtn").addEventListener("click", function(){ viewKey = todayKey(); render(); });
+document.getElementById("datePick").addEventListener("change", function(){
+  if(!this.value) return;
+  if(this.value > todayKey()){ toast("미래 날짜는 볼 수 없습니다"); this.value = viewKey; return; }
+  viewKey = this.value; render();
+});
+
+/* ── modal ────────────────────────────── */
+var scrim = document.getElementById("scrim"), modal = document.getElementById("modal");
+var lastFocus = null;
+
+function openModal(html, wide){
+  lastFocus = document.activeElement;
+  modal.className = "modal" + (wide ? " wide" : "");
+  modal.innerHTML = html;
+  scrim.classList.add("on");
+  var f = modal.querySelector("button");
+  if(f) f.focus();
+}
+function closeModal(){
+  scrim.classList.remove("on");
+  modal.innerHTML = "";
+  if(lastFocus && lastFocus.focus) lastFocus.focus();
+}
+scrim.addEventListener("click", function(e){ if(e.target === scrim) closeModal(); });
+document.addEventListener("keydown", function(e){ if(e.key === "Escape" && scrim.classList.contains("on")) closeModal(); });
+
+function confirmModal(title, bodyHtml, okText, onOk){
+  openModal(
+    "<h3>" + esc(title) + "</h3>" + bodyHtml +
+    '<div class="mrow"><button class="btn" data-x>취소</button>' +
+    '<button class="btn pri" data-ok>' + esc(okText) + "</button></div>"
+  );
+  modal.querySelector("[data-x]").addEventListener("click", closeModal);
+  var ok = modal.querySelector("[data-ok]");
+  ok.addEventListener("click", function(){ closeModal(); onOk(); });
+  ok.focus();
+}
+
+/* ── CSV ──────────────────────────────── */
+function csvCell(v){
+  v = String(v == null ? "" : v);
+  return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
+}
+function buildCSV(keys){
+  var rows = [["날짜","이름","출근","퇴근","근무시간(분)","근무시간","메모"]];
+  keys.sort().forEach(function(k){
+    STAFF.forEach(function(name){
+      var d = DB[k] || {}, r = d[name];
+      if(!r || (!r.in && !r.out && !r.memo)) return;
+      var mins = (r.in && r.out) ? Math.floor((r.out - r.in)/60000) : "";
+      rows.push([k, name, r.in ? hhmm(r.in) : "", r.out ? hhmm(r.out) : "",
+                 mins, mins === "" ? "" : durPlain(r.out - r.in), r.memo || ""]);
+    });
+  });
+  return rows.map(function(r){ return r.map(csvCell).join(","); }).join("\n");
+}
+function csvModal(title, text){
+  if(!text || text.indexOf("\n") === -1){
+    toast("내보낼 기록이 없습니다"); return;
+  }
+  openModal(
+    "<h3>" + esc(title) + "</h3>" +
+    "<p>아래 내용을 복사해 엑셀이나 구글 시트에 붙여넣으세요.</p>" +
+    '<textarea class="csv" readonly>' + esc(text) + "</textarea>" +
+    '<div class="mrow"><button class="btn" data-x>닫기</button>' +
+    '<button class="btn pri" data-c>복사하기</button></div>', true
+  );
+  modal.querySelector("[data-x]").addEventListener("click", closeModal);
+  modal.querySelector("[data-c]").addEventListener("click", function(){
+    var ta = modal.querySelector("textarea");
+    ta.focus(); ta.select();
+    var done = false;
+    try{ done = document.execCommand("copy"); }catch(e){}
+    if(!done && navigator.clipboard){
+      navigator.clipboard.writeText(text).then(function(){ toast("복사했습니다"); },
+        function(){ toast("복사 실패 — 직접 선택해 복사해 주세요"); });
+      return;
+    }
+    toast(done ? "복사했습니다" : "복사 실패 — 직접 선택해 복사해 주세요");
+  });
+}
+document.getElementById("csvDay").addEventListener("click", function(){
+  csvModal(prettyDate(viewKey) + " CSV", buildCSV([viewKey]));
+});
+document.getElementById("csvAll").addEventListener("click", function(){
+  csvModal("전체 기록 CSV", buildCSV(Object.keys(DB)));
+});
+
+/* ── toast ────────────────────────────── */
+var toastEl = document.getElementById("toast"), toastT = null;
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add("on");
+  clearTimeout(toastT);
+  toastT = setTimeout(function(){ toastEl.classList.remove("on"); }, 2400);
+}
+
+/* ── go ───────────────────────────────── */
+load();
+render();
+tick();
+setInterval(tick, 1000);
+
+window.__att = { DB:function(){return DB;}, view:function(){return viewKey;}, punch:onPunch, render:render, key:KEY };
+})();
+</script>
+</body>
+</html>
 
