@@ -24,6 +24,9 @@ tailwind.config = {
         cobalt: "#23479B",
         cobalt2:"#4A72CE",
         cobaltSoft:"#E4EAF7",
+        rest:   "#3F6B52",
+        rest2:  "#6D9C82",
+        restSoft:"#E2EDE6",
         gold:   "#B57C08",
         gold2:  "#E8A317",
         goldSoft:"#FAEDD2"
@@ -100,18 +103,80 @@ const prettyDate = k => { const d=parseKey(k); return `${d.getMonth()+1}월 ${d.
 const yearOf = k => parseKey(k).getFullYear();
 const hhmm = ts => { const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); };
 const durPlain = ms => { ms=Math.max(0,ms); const m=Math.floor(ms/60000); return `${Math.floor(m/60)}시간 ${m%60}분`; };
+const durTight = ms => { ms=Math.max(0,ms); const m=Math.floor(ms/60000); return m<60 ? `${m}분` : `${Math.floor(m/60)}시간 ${m%60}분`; };
 
 function loadDB(){
   try{ const r=localStorage.getItem(KEY); const o=r?JSON.parse(r):{}; return (o&&typeof o==="object")?o:{}; }
   catch(e){ return {}; }
 }
-const blank = () => ({ in:null, out:null, memo:"" });
+const blank = () => ({ in:null, out:null, memo:"", breaks:[] });
 const getRec = (db,k,n) => (db[k] && db[k][n]) || blank();
-const stateOf = r => !r.in ? "idle" : (!r.out ? "work" : "done");
+const openBreak = r => (r.breaks || []).find(b => b.start && !b.end) || null;
+const breakMs = (r, ref) => (r.breaks || []).reduce((a,b) => {
+  if(!b.start) return a;
+  const end = b.end != null ? b.end : (ref != null ? ref : Date.now());
+  return a + Math.max(0, end - b.start);
+}, 0);
+/* 실근무 = 체류 − 휴게 */
+const netMs = (r, ref) => {
+  if(!r.in) return 0;
+  const end = r.out != null ? r.out : (ref != null ? ref : Date.now());
+  return Math.max(0, (end - r.in) - breakMs(r, end));
+};
+const grossMs = (r, ref) => {
+  if(!r.in) return 0;
+  const end = r.out != null ? r.out : (ref != null ? ref : Date.now());
+  return Math.max(0, end - r.in);
+};
+const stateOf = r => !r.in ? "idle" : (!r.out ? (openBreak(r) ? "rest" : "work") : "done");
+
+/* ─────────── 설정(휴게 공제·백업) ─────────── */
+const SKEY = "casape-settings-v1";
+const DEFAULTS = { lastExport: null };
+function loadSettings(){
+  try{ const r = localStorage.getItem(SKEY); const o = r ? JSON.parse(r) : {};
+       return Object.assign({}, DEFAULTS, (o && typeof o === "object") ? o : {}); }
+  catch(e){ return Object.assign({}, DEFAULTS); }
+}
+
+/* ─────────── 월 유틸 ─────────── */
+const monthKey   = () => todayKey().slice(0,7);
+const prettyMonth = m => { const p = m.split("-"); return p[0] + "년 " + (+p[1]) + "월"; };
+const shiftMonth  = (m,n) => { const p = m.split("-"); const d = new Date(+p[0], +p[1]-1+n, 1);
+                               return d.getFullYear() + "-" + pad(d.getMonth()+1); };
+
+function monthStats(db, m, s){
+  const per = {};
+  STAFF.forEach(n => per[n] = { days:0, gross:0, brk:0, missing:[] });
+  Object.keys(db).filter(k => k.slice(0,7) === m).sort().forEach(k => {
+    STAFF.forEach(n => {
+      const r = (db[k] || {})[n];
+      if(!r) return;
+      if(r.in && r.out){
+        per[n].days++;
+        per[n].gross += grossMs(r);
+        per[n].brk   += breakMs(r, r.out);
+      } else if(r.in && !r.out){
+        per[n].missing.push(k);
+      }
+    });
+  });
+  return per;
+}
+
+/* 태블릿 재시작 대비 — 어제 미퇴근자가 남아 있으면 그 날짜를 다시 열어 준다 */
+function openDayKey(db){
+  const tk = todayKey();
+  const yk = ymd(new Date(Date.now() - 86400000));
+  const day = db[yk] || {};
+  const stillOpen = STAFF.some(n => day[n] && day[n].in && !day[n].out);
+  return stillOpen ? yk : tk;
+}
 
 const TONE = {
   idle: { label:"미출근",   ink:"text-muted",      ring:"border-line",       chip:"bg-paper2 text-muted",        bar:"bg-line" },
   work: { label:"근무중",   ink:"text-gold",       ring:"border-gold2/70",   chip:"bg-goldSoft text-gold",       bar:"bg-gold2" },
+  rest: { label:"휴게중",   ink:"text-rest",       ring:"border-rest2/70",   chip:"bg-restSoft text-rest",       bar:"bg-rest2" },
   done: { label:"퇴근완료", ink:"text-cobalt",     ring:"border-cobalt2/60", chip:"bg-cobaltSoft text-cobalt",   bar:"bg-cobalt" }
 };
 
@@ -153,15 +218,16 @@ function Stamp({ st, justChanged }){
     );
   }
   const done = st === "done";
-  const c = done ? "text-cobalt border-cobalt" : "text-gold border-gold";
+  const rest = st === "rest";
+  const c = done ? "text-cobalt border-cobalt" : (rest ? "text-rest border-rest" : "text-gold border-gold");
   return (
     <div className={`relative w-[68px] h-[68px] shrink-0 ${justChanged ? "stamp-pop" : ""}`} style={{transform:"rotate(-9deg)"}}>
       <div className={`absolute inset-0 rounded-full border-[2.5px] ${c} opacity-90`}></div>
       <div className={`absolute inset-[5px] rounded-full border ${c} opacity-45`}></div>
       <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-        <span className={`han text-[15px] ${c.split(" ")[0]}`}>{done ? "퇴근" : "근무"}</span>
+        <span className={`han text-[15px] ${c.split(" ")[0]}`}>{done ? "퇴근" : (rest ? "휴게" : "근무")}</span>
         <span className={`num text-[10px] mt-[3px] font-semibold tracking-wider ${c.split(" ")[0]} opacity-75`}>
-          {done ? "OUT" : "IN"}
+          {done ? "OUT" : (rest ? "REST" : "IN")}
         </span>
       </div>
     </div>
@@ -169,10 +235,14 @@ function Stamp({ st, justChanged }){
 }
 
 /* ─────────── 카드 ─────────── */
-function Card({ name, rec, locked, now, onPunch, onMemo, onUndo, flash }){
+function Card({ name, rec, locked, now, onPunch, onMemo, onUndo, onFix, onBreak, flash }){
+  const canFix = locked && rec.in && (!rec.out || rec.fixed);
   const st = stateOf(rec);
   const t = TONE[st];
-  const dur = st === "work" ? now - rec.in : (st === "done" ? rec.out - rec.in : 0);
+  const ob = openBreak(rec);
+  const brk = rec.in ? breakMs(rec, rec.out != null ? rec.out : now) : 0;
+  const net = rec.in ? netMs(rec, now) : 0;
+  const restRun = ob ? now - ob.start : 0;
 
   return (
     <article className={`group relative rounded-[20px] bg-card border overflow-hidden
@@ -209,18 +279,39 @@ function Card({ name, rec, locked, now, onPunch, onMemo, onUndo, flash }){
             <div className="num text-[9.5px] font-semibold tracking-[.19em] text-muted">OUT</div>
             <div className={`num text-[22px] font-semibold mt-[3px] leading-none ${rec.out ? "text-ink" : "text-line"}`}>
               {rec.out ? hhmm(rec.out) : "--:--"}
+              {rec.fixed && <span className="ml-1.5 align-middle rounded-full bg-cobaltSoft px-[7px] py-[2px] text-[10px] font-bold text-cobalt tracking-normal">보정</span>}
+            </div>
+          </div>
+          <div>
+            <div className="num text-[9.5px] font-semibold tracking-[.19em] text-muted">휴게</div>
+            <div className={`num text-[22px] font-semibold mt-[3px] leading-none ${brk ? "text-rest" : "text-line"}`}>
+              {brk ? durTight(brk) : "--"}
             </div>
           </div>
         </div>
 
         <div className="mt-5 pt-4 border-t border-dashed border-line2 flex items-baseline">
-          <span className="num text-[9.5px] font-semibold tracking-[.19em] text-muted">TOTAL</span>
+          <span className="num text-[9.5px] font-semibold tracking-[.19em] text-muted">실근무</span>
           <span className={`ml-auto text-[17px] font-bold tracking-tight ${st==="idle" ? "text-line" : t.ink}`}>
-            {st === "idle" ? "—" : durPlain(dur)}
-            {st === "work" && <span className="ml-[6px] text-[11px] font-medium text-muted">진행중</span>}
+            {st === "idle" ? "—" : durPlain(net)}
+            {(st === "work" || st === "rest") && <span className="ml-[6px] text-[11px] font-medium text-muted">진행중</span>}
           </span>
         </div>
       </button>
+
+      {!locked && (st === "work" || st === "rest") && (
+        <div className="border-t border-line2 px-4 py-3 bg-paper/40">
+          <button type="button" onClick={onBreak}
+            className={`w-full rounded-xl py-3 text-[14px] font-bold tracking-tight transition-colors
+              ${st === "rest"
+                ? "bg-rest text-card hover:bg-rest2"
+                : "border border-rest2/55 bg-restSoft/70 text-rest hover:bg-restSoft"}`}>
+            {st === "rest"
+              ? <>휴게 종료 <span className="num font-semibold opacity-90">({durTight(restRun)} 경과)</span></>
+              : "휴게 시작"}
+          </button>
+        </div>
+      )}
 
       <div className="flex items-stretch border-t border-line2 bg-paper/55">
         <textarea rows="2" value={rec.memo || ""} readOnly={locked}
@@ -232,6 +323,13 @@ function Card({ name, rec, locked, now, onPunch, onMemo, onUndo, flash }){
           <button type="button" onClick={onUndo} title={`${name} 기록 되돌리기`} aria-label={`${name} 기록 되돌리기`}
             className="w-[46px] shrink-0 border-l border-line2 text-muted text-[15px]
                        hover:text-gold hover:bg-goldSoft/60 transition-colors">↺</button>
+        )}
+        {canFix && (
+          <button type="button" onClick={onFix}
+            className={`shrink-0 border-l border-line2 px-4 text-[12px] font-semibold whitespace-nowrap transition-colors
+              ${rec.out ? "text-cobalt hover:bg-cobaltSoft/60" : "text-gold bg-goldSoft/50 hover:bg-goldSoft"}`}>
+            {rec.out ? "보정 수정" : "퇴근 시각 입력"}
+          </button>
         )}
       </div>
     </article>
@@ -276,11 +374,108 @@ function Modal({ data, onClose }){
   );
 }
 
+/* ─────────── 월간 정산 ─────────── */
+function MonthView({ db, month, setMonth, settings, saveSettings, onGoDate, onCSV }){
+  const per = monthStats(db, month, settings);
+  const rows = STAFF.map(n => {
+    const x = per[n];
+    const net = Math.max(0, x.gross - x.brk);
+    return { name:n, days:x.days, gross:x.gross, brk:x.brk, net, missing:x.missing };
+  });
+  const sum = f => rows.reduce((a,r) => a + f(r), 0);
+  const tDays = sum(r => r.days), tGross = sum(r => r.gross), tBrk = sum(r => r.brk), tNet = sum(r => r.net);
+  const tMiss = sum(r => r.missing.length);
+  const atNow = month >= monthKey();
+  const empty = tDays === 0 && tMiss === 0;
+
+  return (
+    <section className="mt-8">
+      {/* 월 이동 */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <button onClick={() => setMonth(shiftMonth(month,-1))}
+          className="rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] font-medium text-ink2 hover:border-cobalt hover:text-cobalt transition-colors">◀ 이전달</button>
+        <div className="num rounded-full border border-line bg-card px-4 py-2 text-[13px] font-semibold text-ink">{prettyMonth(month)}</div>
+        <button onClick={() => { if(!atNow) setMonth(shiftMonth(month,1)); }} disabled={atNow}
+          className="rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] font-medium text-ink2 enabled:hover:border-cobalt enabled:hover:text-cobalt disabled:opacity-35 transition-colors">다음달 ▶</button>
+        <button onClick={() => setMonth(monthKey())}
+          className="rounded-full bg-ink px-4 py-2 text-[12.5px] font-semibold text-paper hover:bg-cobalt transition-colors">이번 달</button>
+        <button onClick={onCSV}
+          className="ml-auto rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] font-medium text-ink2 hover:border-cobalt hover:text-cobalt transition-colors">이 달 CSV</button>
+      </div>
+
+      {/* 휴게 안내 */}
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-rest2/40 bg-restSoft/50 px-5 py-4">
+        <span className="num text-[9.5px] font-bold tracking-[.2em] text-rest">BREAK</span>
+        <span className="text-[13px] text-ink2">
+          휴게는 <b className="text-rest">실제로 버튼을 눌러 기록된 시간만</b> 공제합니다. 자동 공제는 하지 않습니다.
+        </span>
+      </div>
+
+      {/* 표 */}
+      <div className="mt-5 rounded-[20px] border border-line bg-card overflow-x-auto shadow-[0_16px_36px_-30px_rgba(36,28,21,.5)]">
+        <table className="w-full min-w-[720px] text-[13.5px]">
+          <thead>
+            <tr className="bg-paper/70">
+              {["이름","출근일수","총 체류","휴게","실근무","확인필요"].map(h => (
+                <th key={h} className="num text-left text-[9.5px] font-bold tracking-[.2em] text-muted px-5 py-3.5 border-b border-line whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.name} className="border-b border-line2 last:border-0 hover:bg-paper/50 transition-colors">
+                <td className="px-5 py-3.5 whitespace-nowrap font-semibold text-ink">{r.name}</td>
+                <td className="num px-5 py-3.5 whitespace-nowrap text-ink2">{r.days ? r.days + "일" : "—"}</td>
+                <td className="px-5 py-3.5 whitespace-nowrap text-ink2">{r.days ? durPlain(r.gross) : "—"}</td>
+                <td className="px-5 py-3.5 whitespace-nowrap text-muted">{r.brk ? "-" + durTight(r.brk) : "—"}</td>
+                <td className={`px-5 py-3.5 whitespace-nowrap font-bold ${r.days ? "text-cobalt" : "text-line"}`}>{r.days ? durPlain(r.net) : "—"}</td>
+                <td className="px-5 py-3.5 whitespace-nowrap">
+                  {r.missing.length ? (
+                    <button onClick={() => onGoDate(r.missing[0])}
+                      className="rounded-full border border-gold2/55 bg-goldSoft/70 px-3 py-1.5 text-[12px] font-semibold text-gold hover:border-gold transition-colors">
+                      퇴근 누락 <span className="num">{r.missing.length}</span>일 ▸
+                    </button>
+                  ) : <span className="text-muted">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="bg-paper/70 border-t border-line">
+              <td className="px-5 py-4 font-bold text-ink">합계</td>
+              <td className="num px-5 py-4 font-semibold text-ink2 whitespace-nowrap">{tDays ? tDays + "일" : "—"}</td>
+              <td className="px-5 py-4 font-semibold text-ink2 whitespace-nowrap">{tGross ? durPlain(tGross) : "—"}</td>
+              <td className="px-5 py-4 font-semibold text-muted whitespace-nowrap">{tBrk ? "-" + durTight(tBrk) : "—"}</td>
+              <td className="px-5 py-4 font-bold text-cobalt whitespace-nowrap">{tNet ? durPlain(tNet) : "—"}</td>
+              <td className="px-5 py-4 text-[12px] whitespace-nowrap">
+                {tMiss ? <span className="font-semibold text-gold"><span className="num">{tMiss}</span>건</span> : <span className="text-muted">없음</span>}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {empty && (
+        <p className="mt-6 text-[13px] text-muted">{prettyMonth(month)}에 기록된 근무가 없습니다.</p>
+      )}
+
+      <p className="mt-6 text-[11.5px] leading-relaxed text-muted">
+        <b className="text-ink2">실근무 = 총 체류 − 휴게</b>. 휴게는 카드의 휴게 버튼으로 <b className="text-rest">실제 기록된 시간만</b> 빠지며, 버튼을 누르지 않은 날은 휴게 0분으로 계산됩니다.<br />
+        퇴근 도장이 찍히지 않은 날은 시간을 계산할 수 없어 합계에서 빠지고 <b className="text-gold">확인필요</b>에 표시됩니다 — 눌러서 그 날짜로 이동해 채워 주세요.<br />
+        시간은 실제로 도장을 찍은 시각 그대로 1분 단위로 합산합니다.
+      </p>
+    </section>
+  );
+}
+
 /* ─────────── 앱 ─────────── */
 function App(){
   const [db, setDb] = useState(loadDB);
-  const [viewKey, setViewKey] = useState(todayKey);
-  const [activeKey, setActiveKey] = useState(todayKey);
+  const [viewKey, setViewKey] = useState(() => openDayKey(loadDB()));
+  const [activeKey, setActiveKey] = useState(() => openDayKey(loadDB()));
+  const [tab, setTab] = useState("board");
+  const [month, setMonth] = useState(monthKey);
+  const [settings, setSettings] = useState(loadSettings);
   const [now, setNow] = useState(Date.now());
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
@@ -312,6 +507,12 @@ function App(){
     catch(e){ say("저장 공간에 쓸 수 없어 이번 기록이 남지 않았습니다"); }
   }, []);
 
+  const saveSettings = patch => {
+    const next = Object.assign({}, settings, patch);
+    setSettings(next);
+    try{ localStorage.setItem(SKEY, JSON.stringify(next)); }catch(e){}
+  };
+
   function say(msg){
     setToast(msg);
     clearTimeout(toastT.current);
@@ -339,36 +540,101 @@ function App(){
       say(`${name} 출근 ${hhmm(t)}`);
       return;
     }
-    if(st === "work"){
+    if(st === "work" || st === "rest"){
       const t = Date.now();
+      const ob = openBreak(r);
+      const brkNow = breakMs(r, t);
       setModal({
         title: `${name} 퇴근`,
         body: (
           <div>
             <p><b className="num font-semibold text-ink">{hhmm(r.in)}</b> 출근 → 지금 <b className="num font-semibold text-ink">{hhmm(t)}</b> 로 퇴근 도장을 찍습니다.</p>
-            <p className="mt-4 text-muted text-[11px] num font-semibold tracking-[.18em]">TODAY</p>
-            <p className="han text-[34px] text-cobalt leading-none mt-1">{durPlain(t - r.in)}</p>
+            {ob && <p className="mt-2 text-rest">휴게가 진행 중입니다 — <b>지금 자동으로 종료</b>됩니다.</p>}
+            <p className="mt-4 text-muted text-[11px] num font-semibold tracking-[.18em]">체류 / 휴게 / 실근무</p>
+            <p className="text-[15px] text-ink2 mt-1">
+              <span className="num font-semibold">{durPlain(t - r.in)}</span>
+              <span className="mx-2 text-muted">−</span>
+              <span className="num font-semibold text-rest">{brkNow ? durTight(brkNow) : "0분"}</span>
+            </p>
+            <p className="han text-[34px] text-cobalt leading-none mt-2">{durPlain(Math.max(0,(t - r.in) - brkNow))}</p>
           </div>
         ),
         okText: "퇴근 도장",
         onOk: () => {
           const o = Date.now();
-          write(name, { out:o });
+          const bs = (r.breaks || []).map(b => (b.start && !b.end) ? { ...b, end:o } : b);
+          write(name, { out:o, breaks:bs });
           setFlash(name); setTimeout(() => setFlash(null), 500);
-          say(`${name} 퇴근 ${hhmm(o)} · ${durPlain(o - r.in)}`);
+          const nb = bs.reduce((a,b) => a + Math.max(0,(b.end||o) - b.start), 0);
+          say(`${name} 퇴근 ${hhmm(o)} · 실근무 ${durPlain(Math.max(0,(o - r.in) - nb))}`);
         }
       });
       return;
     }
-    say(`${name} 오늘 근무 ${durPlain(r.out - r.in)} · 마감`);
+    say(`${name} 오늘 실근무 ${durPlain(netMs(r))} · 마감`);
+  }
+
+  /* 휴게 — 1회 시작 / 1회 종료 */
+  function punchBreak(name){
+    if(locked){ say("지난 날짜는 조회만 가능합니다"); return; }
+    const r = getRec(db, viewKey, name);
+    if(!r.in || r.out){ say("근무 중일 때만 휴게를 찍을 수 있습니다"); return; }
+    const list = (r.breaks || []).slice();
+    const idx = list.findIndex(b => b.start && !b.end);
+    const t = Date.now();
+    if(idx === -1){
+      list.push({ start:t, end:null });
+      write(name, { breaks:list });
+      setFlash(name); setTimeout(() => setFlash(null), 500);
+      say(`${name} 휴게 시작 ${hhmm(t)}`);
+    } else {
+      list[idx] = { ...list[idx], end:t };
+      write(name, { breaks:list });
+      setFlash(name); setTimeout(() => setFlash(null), 500);
+      const total = list.reduce((a,b) => a + Math.max(0,(b.end||t) - b.start), 0);
+      say(`${name} 휴게 종료 ${hhmm(t)} · 이번 ${durTight(t - list[idx].start)} / 오늘 ${durTight(total)}`);
+    }
   }
 
   function undo(name){
     setModal({
       title: `${name} 기록 되돌리기`,
-      body: <p>이 날짜의 <b className="text-ink font-semibold">출근·퇴근 시각</b>을 지웁니다. 메모는 그대로 남습니다.</p>,
+      body: <p>이 날짜의 <b className="text-ink font-semibold">출근·퇴근 시각과 휴게 기록</b>을 지웁니다. 메모는 그대로 남습니다.</p>,
       okText: "되돌리기",
-      onOk: () => { write(name, { in:null, out:null }); say(`${name} 기록을 되돌렸습니다`); }
+      onOk: () => { write(name, { in:null, out:null, breaks:[], fixed:false }); say(`${name} 기록을 되돌렸습니다`); }
+    });
+  }
+
+  function fixOut(name){
+    const r = getRec(db, viewKey, name);
+    if(!r.in) return;
+    const def = r.out ? hhmm(r.out) : "18:00";
+    setModal({
+      title: `${name} 퇴근 시각 보정`,
+      body: (
+        <div>
+          <p><b className="num font-semibold text-ink">{prettyDate(viewKey)}</b> · <b className="num font-semibold text-ink">{hhmm(r.in)}</b> 출근 기록만 있고 퇴근 도장이 없습니다.<br />실제 퇴근 시각을 입력해 주세요.</p>
+          <input id="fixtime" type="time" defaultValue={def}
+            className="num mt-4 w-full rounded-xl border border-line bg-paper/60 px-4 py-3 text-[20px] font-semibold text-ink text-center" />
+          <p className="mt-3 text-[11.5px] leading-relaxed text-muted">
+            출근 시각보다 이른 시각을 넣으면 <b className="text-ink2">다음날</b> 퇴근으로 처리됩니다.<br />
+            보정한 기록에는 <b className="text-cobalt">보정</b> 표시가 남습니다.
+          </p>
+        </div>
+      ),
+      okText: "보정 저장",
+      onOk: () => {
+        const el = document.getElementById("fixtime");
+        const v = el && el.value;
+        if(!v){ say("시각을 입력해 주세요"); return; }
+        const hh = +v.split(":")[0], mm = +v.split(":")[1];
+        const base = parseKey(viewKey);
+        let t = new Date(base.getFullYear(), base.getMonth(), base.getDate(), hh, mm).getTime();
+        if(t <= r.in) t += 86400000;
+        const bs2 = (r.breaks || []).map(b => (b.start && !b.end) ? { ...b, end: Math.min(t, b.start) === t ? b.start : t } : b);
+        write(name, { out:t, fixed:true, breaks:bs2 });
+        say(`${name} 퇴근 ${hhmm(t)} 보정 · ${durPlain(t - r.in)}`);
+      }
     });
   }
 
@@ -381,18 +647,61 @@ function App(){
   /* CSV */
   const csvCell = v => { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
   function buildCSV(keys){
-    const rows = [["날짜","이름","출근","퇴근","근무시간(분)","근무시간","메모"]];
+    const rows = [["날짜","이름","출근","퇴근","체류(분)","휴게(분)","실근무(분)","실근무","메모","보정"]];
     keys.slice().sort().forEach(k => STAFF.forEach(n => {
       const r = (db[k] || {})[n];
       if(!r || (!r.in && !r.out && !r.memo)) return;
-      const mins = (r.in && r.out) ? Math.floor((r.out - r.in)/60000) : "";
-      rows.push([k, n, r.in?hhmm(r.in):"", r.out?hhmm(r.out):"", mins, mins===""?"":durPlain(r.out-r.in), r.memo||""]);
+      const done = r.in && r.out;
+      const g  = done ? Math.floor(grossMs(r)/60000) : "";
+      const bm = done ? Math.floor(breakMs(r, r.out)/60000) : "";
+      const nt = done ? Math.floor(netMs(r)/60000) : "";
+      rows.push([k, n, r.in?hhmm(r.in):"", r.out?hhmm(r.out):"", g, bm, nt,
+                 done ? durPlain(netMs(r)) : (r.in ? "퇴근누락" : ""), r.memo||"", r.fixed?"보정":""]);
     }));
     return rows.map(r => r.map(csvCell).join(",")).join("\n");
   }
   function openCSV(title, keys){
     const text = buildCSV(keys);
     if(text.indexOf("\n") === -1){ say("내보낼 기록이 없습니다"); return; }
+    openCSVText(title, text);
+  }
+
+  function buildMonthCSV(m){
+    const per = monthStats(db, m, settings);
+    const rows = [];
+    rows.push(["월간 정산", prettyMonth(m)]);
+    rows.push(["휴게 공제", "실제 기록된 휴게시간만 공제 (자동 공제 없음)"]);
+    rows.push([]);
+    rows.push(["이름","출근일수","총 체류(분)","휴게(분)","실근무(분)","실근무","퇴근누락(일)"]);
+    let any = false;
+    STAFF.forEach(n => {
+      const x = per[n];
+      if(!x.days && !x.missing.length) return;
+      any = true;
+      const net = Math.max(0, x.gross - x.brk);
+      rows.push([n, x.days, Math.floor(x.gross/60000), Math.floor(x.brk/60000),
+                 Math.floor(net/60000), durPlain(net), x.missing.length]);
+    });
+    if(!any) return null;
+    rows.push([]);
+    rows.push(["일별 상세"]);
+    rows.push(["날짜","이름","출근","퇴근","체류(분)","휴게(분)","실근무(분)","메모","보정"]);
+    Object.keys(db).filter(k => k.slice(0,7) === m).sort().forEach(k => STAFF.forEach(n => {
+      const r = (db[k] || {})[n];
+      if(!r || (!r.in && !r.out && !r.memo)) return;
+      if(r.in && r.out){
+        rows.push([k, n, hhmm(r.in), hhmm(r.out),
+                   Math.floor(grossMs(r)/60000), Math.floor(breakMs(r, r.out)/60000),
+                   Math.floor(netMs(r)/60000), r.memo || "", r.fixed ? "보정" : ""]);
+      } else {
+        rows.push([k, n, r.in ? hhmm(r.in) : "", r.out ? hhmm(r.out) : "",
+                   "퇴근누락", "", "", r.memo || "", ""]);
+      }
+    }));
+    return rows.map(r => r.map(csvCell).join(",")).join("\n");
+  }
+
+  function openCSVText(title, text){
     setModal({
       title, wide:true, cancelText:"닫기", okText:"복사하기",
       body: (
@@ -403,6 +712,7 @@ function App(){
         </div>
       ),
       onOk: () => {
+        saveSettings({ lastExport: Date.now() });
         const ta = document.getElementById("csvbox");
         let ok = false;
         try{ if(ta){ ta.focus(); ta.select(); ok = document.execCommand("copy"); } }catch(e){}
@@ -418,11 +728,25 @@ function App(){
   /* 집계 */
   const rows = STAFF.map(n => { const r = getRec(db, viewKey, n); return { name:n, r, st:stateOf(r) }; });
   const nWork = rows.filter(x => x.st === "work").length;
+  const nRest = rows.filter(x => x.st === "rest").length;
   const nDone = rows.filter(x => x.st === "done").length;
   const nIdle = rows.filter(x => x.st === "idle").length;
-  const totalMs = rows.reduce((s,x) => s + (x.st === "done" ? x.r.out - x.r.in : 0), 0);
+  const totalMs = rows.reduce((s,x) => s + (x.st === "done" ? netMs(x.r) : 0), 0);
+  const totalBrk = rows.reduce((s,x) => s + (x.st === "done" ? breakMs(x.r, x.r.out) : 0), 0);
 
   const clock = new Date(now);
+
+  /* 백업 알림 */
+  const hasData = Object.keys(db).some(k => db[k] && Object.keys(db[k]).length);
+  const sinceExport = settings.lastExport ? Math.floor((Date.now() - settings.lastExport)/86400000) : null;
+  const needBackup = hasData && (settings.lastExport == null || sinceExport >= 7);
+
+  function goDate(k){ setTab("board"); setViewKey(k); }
+  function monthCSV(){
+    const text = buildMonthCSV(month);
+    if(!text){ say("이 달에 내보낼 기록이 없습니다"); return; }
+    openCSVText(prettyMonth(month) + " 정산 CSV", text);
+  }
 
   return (
     <div className="min-h-screen">
@@ -433,11 +757,16 @@ function App(){
             <div className="min-w-0">
               <div className="num text-[10px] font-bold tracking-[.28em] text-cobalt">CASAPE · ATTENDANCE</div>
               <h1 className="han text-[40px] sm:text-[52px] leading-[0.95] tracking-tight mt-2.5 text-ink">
-                {locked ? "지난 기록" : (viewKey !== todayKey() ? "어제의 마무리" : "오늘의 도장")}
+                {tab === "month" ? "월간 정산" : (locked ? "지난 기록" : (viewKey !== todayKey() ? "어제의 마무리" : "오늘의 도장"))}
               </h1>
               <p className="mt-2.5 text-[14px] text-ink2">
-                <span className="num font-semibold">{yearOf(viewKey)}</span> · {prettyDate(viewKey)}
-                {!locked && <span className="ml-2 text-muted">— 이름을 누르면 도장이 찍힙니다</span>}
+                {tab === "month" ? (
+                  <><span className="num font-semibold">{prettyMonth(month)}</span>
+                    <span className="ml-2 text-muted">— 휴게시간을 뺀 실근무 시간입니다</span></>
+                ) : (
+                  <><span className="num font-semibold">{yearOf(viewKey)}</span> · {prettyDate(viewKey)}
+                    {!locked && <span className="ml-2 text-muted">— 이름을 누르면 도장이 찍힙니다</span>}</>
+                )}
               </p>
             </div>
 
@@ -450,11 +779,19 @@ function App(){
             </div>
           </div>
 
+          {/* 탭 */}
+          <div className="mt-7 inline-flex rounded-full border border-line bg-card p-1">
+            {[["board","출퇴근 보드"],["month","월간 정산"]].map(([k,lb]) => (
+              <button key={k} onClick={() => setTab(k)}
+                className={`rounded-full px-4 py-2 text-[12.5px] font-semibold transition-colors ${tab===k ? "bg-ink text-paper" : "text-ink2 hover:text-cobalt"}`}>{lb}</button>
+            ))}
+          </div>
+
           {/* 집계 칩 */}
-          <div className="mt-7 flex flex-wrap gap-2.5">
-            {[["근무중",nWork,"work"],["퇴근",nDone,"done"],["미출근",nIdle,"idle"]].map(([lb,v,k]) => (
+          <div className={`mt-4 flex-wrap gap-2.5 ${tab==="board" ? "flex" : "hidden"}`}>
+            {[["근무중",nWork,"work"],["휴게중",nRest,"rest"],["퇴근",nDone,"done"],["미출근",nIdle,"idle"]].map(([lb,v,k]) => (
               <div key={k} className={`flex items-baseline gap-2.5 rounded-full border px-4 py-2
-                ${k==="work" ? "border-gold2/45 bg-goldSoft/55" : k==="done" ? "border-cobalt2/35 bg-cobaltSoft/60" : "border-line bg-paper2/50"}`}>
+                ${k==="work" ? "border-gold2/45 bg-goldSoft/55" : k==="rest" ? "border-rest2/45 bg-restSoft/60" : k==="done" ? "border-cobalt2/35 bg-cobaltSoft/60" : "border-line bg-paper2/50"}`}>
                 <span className={`num text-[21px] font-bold leading-none ${TONE[k].ink}`}>{v}</span>
                 <span className="text-[12px] text-ink2">{lb}</span>
               </div>
@@ -484,11 +821,11 @@ function App(){
       </header>
 
       {/* ── 마키 ── */}
-      <div className="border-b border-line bg-paper2/40 overflow-hidden">
+      <div className={`border-b border-line bg-paper2/40 overflow-hidden ${tab==="board" ? "" : "hidden"}`}>
         <div className="marq flex whitespace-nowrap py-2.5 w-max">
           {[0,1].map(i => (
             <div key={i} className="flex shrink-0">
-              {["이름을 누르면 출근","한 번 더 누르면 퇴근","늦으면 메모칸에 사유를","기록은 이 기기에 자동 저장","지난 날짜는 조회 전용"].map((t,j) => (
+              {["이름을 누르면 출근","한 번 더 누르면 퇴근","늦으면 메모칸에 사유를","휴게 버튼 1회 시작 · 1회 종료","기록은 이 기기에 자동 저장"].map((t,j) => (
                 <span key={j} className="num text-[10.5px] font-semibold tracking-[.22em] text-muted px-7">{t} ·</span>
               ))}
             </div>
@@ -497,6 +834,25 @@ function App(){
       </div>
 
       <main className="mx-auto max-w-[1160px] px-6 pb-24">
+        {needBackup && (
+          <div className="mt-7 flex flex-wrap items-center gap-3 rounded-2xl border border-gold2/45 bg-goldSoft/60 px-5 py-3.5 text-[13px] text-gold">
+            <span className="num text-[10px] font-bold tracking-[.2em] shrink-0">BACKUP</span>
+            <span>
+              {settings.lastExport == null
+                ? "아직 한 번도 백업하지 않았습니다. 기록은 이 태블릿에만 저장됩니다 — CSV로 내보내 보관해 주세요."
+                : <>마지막 백업이 <b className="num">{sinceExport}</b>일 전입니다. CSV로 내보내 보관해 주세요.</>}
+            </span>
+            <button onClick={() => openCSV("전체 기록 CSV", Object.keys(db))}
+              className="ml-auto rounded-full border border-gold2/60 bg-card px-3.5 py-2 text-[12.5px] font-semibold text-gold hover:border-gold transition-colors">지금 백업</button>
+          </div>
+        )}
+
+        {tab === "month" ? (
+          <MonthView db={db} month={month} setMonth={setMonth}
+            settings={settings} saveSettings={saveSettings}
+            onGoDate={goDate} onCSV={monthCSV} />
+        ) : (
+        <>
         {!locked && viewKey !== todayKey() && (
           <div className="mt-7 flex items-center gap-3 rounded-2xl border border-gold2/45 bg-goldSoft/60 px-5 py-3.5 text-[13px] text-gold">
             <span className="num text-[10px] font-bold tracking-[.2em] shrink-0">CARRY OVER</span>
@@ -506,7 +862,7 @@ function App(){
         {locked && (
           <div className="mt-7 flex items-center gap-3 rounded-2xl border border-cobalt2/35 bg-cobaltSoft/55 px-5 py-3.5 text-[13px] text-cobalt">
             <span className="num text-[10px] font-bold tracking-[.2em] shrink-0">READ ONLY</span>
-            <span>지난 날짜를 보고 있습니다. 도장을 찍으려면 <b>오늘</b>로 돌아가세요.</span>
+            <span>지난 날짜를 보고 있습니다. 도장을 찍으려면 <b>오늘</b>로 돌아가세요 — 퇴근이 빠진 기록은 카드에서 <b>시각을 직접 입력</b>해 보정할 수 있습니다.</span>
           </div>
         )}
 
@@ -517,7 +873,9 @@ function App(){
               flash={flash === name}
               onPunch={() => punch(name)}
               onMemo={v => { if(!locked) write(name, { memo:v }); }}
-              onUndo={() => undo(name)} />
+              onUndo={() => undo(name)}
+              onFix={() => fixOut(name)}
+              onBreak={() => punchBreak(name)} />
           ))}
         </section>
 
@@ -536,7 +894,7 @@ function App(){
             <table className="w-full min-w-[600px] text-[13.5px]">
               <thead>
                 <tr className="bg-paper/70">
-                  {["이름","출근","퇴근","근무시간","메모"].map(h => (
+                  {["이름","출근","퇴근","휴게","실근무","메모"].map(h => (
                     <th key={h} className="num text-left text-[9.5px] font-bold tracking-[.2em] text-muted px-5 py-3.5 border-b border-line">{h}</th>
                   ))}
                 </tr>
@@ -549,10 +907,16 @@ function App(){
                       <span className="font-semibold text-ink">{name}</span>
                     </td>
                     <td className="num px-5 py-3.5 whitespace-nowrap text-ink2">{r.in ? hhmm(r.in) : "—"}</td>
-                    <td className="num px-5 py-3.5 whitespace-nowrap text-ink2">{r.out ? hhmm(r.out) : "—"}</td>
+                    <td className="num px-5 py-3.5 whitespace-nowrap text-ink2">
+                      {r.out ? hhmm(r.out) : "—"}
+                      {r.fixed && <span className="ml-1.5 rounded-full bg-cobaltSoft px-[6px] py-[1px] text-[10px] font-bold text-cobalt">보정</span>}
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap text-rest">
+                      {r.in ? (breakMs(r, r.out != null ? r.out : now) ? "-" + durTight(breakMs(r, r.out != null ? r.out : now)) : "—") : "—"}
+                    </td>
                     <td className={`px-5 py-3.5 whitespace-nowrap font-semibold ${st==="idle" ? "text-line" : TONE[st].ink}`}>
-                      {st==="idle" ? "—" : durPlain(st==="work" ? now - r.in : r.out - r.in)}
-                      {st==="work" && <span className="ml-1.5 text-[11px] font-medium text-muted">진행중</span>}
+                      {st==="idle" ? "—" : durPlain(netMs(r, now))}
+                      {(st==="work"||st==="rest") && <span className="ml-1.5 text-[11px] font-medium text-muted">진행중</span>}
                     </td>
                     <td className="px-5 py-3.5 text-[12.5px] text-ink2 max-w-[300px]">{r.memo || ""}</td>
                   </tr>
@@ -563,6 +927,7 @@ function App(){
                   <td className="px-5 py-4 font-bold text-ink">합계</td>
                   <td className="px-5 py-4"></td>
                   <td className="px-5 py-4"></td>
+                  <td className="px-5 py-4 font-semibold text-rest whitespace-nowrap">{totalBrk ? "-" + durTight(totalBrk) : "—"}</td>
                   <td className="px-5 py-4 font-bold text-cobalt whitespace-nowrap">{totalMs ? durPlain(totalMs) : "—"}</td>
                   <td className="px-5 py-4 text-[12px] text-muted whitespace-nowrap">퇴근 완료 기준</td>
                 </tr>
@@ -575,6 +940,8 @@ function App(){
             메모칸 오른쪽 ↺ 는 그 사람의 그날 출퇴근 시각을 처음으로 되돌립니다.
           </p>
         </section>
+        </>
+        )}
       </main>
 
       <Modal data={modal} onClose={() => setModal(null)} />
