@@ -337,6 +337,34 @@ function Card({ name, rec, locked, now, onPunch, onMemo, onUndo, onFix, onBreak,
   );
 }
 
+/* ─────────── 관리자 잠금 패널 ─────────── */
+function AdminGate({ title, className, heading, pw, setPw, onUnlock }){
+  return (
+    <section className={className || "mt-16"}>
+      {heading !== false && (
+        <div className="flex items-center gap-4 mb-5">
+          <h2 className="han text-[24px] text-ink leading-none">{title}</h2>
+          <div className="h-px flex-1 bg-line"></div>
+        </div>
+      )}
+      <div className="rounded-[20px] border border-line bg-card px-6 py-12 text-center shadow-[0_16px_36px_-30px_rgba(36,28,21,.5)]">
+        <div className="num text-[10px] font-bold tracking-[.22em] text-muted">ADMIN ONLY</div>
+        <p className="mt-3 text-[13.5px] leading-relaxed text-ink2">
+          {title}은 관리자만 볼 수 있습니다.<br />비밀번호를 입력해 주세요.
+        </p>
+        <form onSubmit={e => { e.preventDefault(); onUnlock(); }}
+          className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          <input type="password" value={pw} onChange={e => setPw(e.target.value)}
+            placeholder="비밀번호" aria-label="관리자 비밀번호"
+            className="w-[180px] rounded-xl border border-line bg-paper/60 px-4 py-3 text-[15px] text-ink text-center focus:border-cobalt transition-colors" />
+          <button type="submit"
+            className="rounded-xl bg-ink px-5 py-3 text-[13.5px] font-semibold text-paper hover:bg-cobalt transition-colors">확인</button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
 /* ─────────── 모달 ─────────── */
 function Modal({ data, onClose }){
   const ref = useRef(null);
@@ -850,15 +878,23 @@ function App(){
                 ? "아직 한 번도 백업하지 않았습니다. 기록은 이 태블릿에만 저장됩니다 — CSV로 내보내 보관해 주세요."
                 : <>마지막 백업이 <b className="num">{sinceExport}</b>일 전입니다. CSV로 내보내 보관해 주세요.</>}
             </span>
-            <button onClick={() => openCSV("전체 기록 CSV", Object.keys(db))}
-              className="ml-auto rounded-full border border-gold2/60 bg-card px-3.5 py-2 text-[12.5px] font-semibold text-gold hover:border-gold transition-colors">지금 백업</button>
+            {admin ? (
+              <button onClick={() => openCSV("전체 기록 CSV", Object.keys(db))}
+                className="ml-auto rounded-full border border-gold2/60 bg-card px-3.5 py-2 text-[12.5px] font-semibold text-gold hover:border-gold transition-colors">지금 백업</button>
+            ) : (
+              <span className="num ml-auto text-[10px] font-bold tracking-[.2em] text-gold/70 shrink-0">ADMIN ONLY</span>
+            )}
           </div>
         )}
 
         {tab === "month" ? (
-          <MonthView db={db} month={month} setMonth={setMonth}
-            settings={settings} saveSettings={saveSettings}
-            onGoDate={goDate} onCSV={monthCSV} />
+          admin ? (
+            <MonthView db={db} month={month} setMonth={setMonth}
+              settings={settings} saveSettings={saveSettings}
+              onGoDate={goDate} onCSV={monthCSV} />
+          ) : (
+            <AdminGate title="월간 정산" className="mt-10" heading={false} pw={pw} setPw={setPw} onUnlock={unlock} />
+          )
         ) : (
         <>
         {!locked && viewKey !== todayKey() && (
@@ -889,26 +925,7 @@ function App(){
 
         {/* ── 요약 (관리자 전용) ── */}
         {!admin ? (
-        <section className="mt-16">
-          <div className="flex items-center gap-4 mb-5">
-            <h2 className="han text-[24px] text-ink leading-none">근무 요약</h2>
-            <div className="h-px flex-1 bg-line"></div>
-          </div>
-          <div className="rounded-[20px] border border-line bg-card px-6 py-12 text-center shadow-[0_16px_36px_-30px_rgba(36,28,21,.5)]">
-            <div className="num text-[10px] font-bold tracking-[.22em] text-muted">ADMIN ONLY</div>
-            <p className="mt-3 text-[13.5px] leading-relaxed text-ink2">
-              근무 요약은 관리자만 볼 수 있습니다.<br />비밀번호를 입력해 주세요.
-            </p>
-            <form onSubmit={e => { e.preventDefault(); unlock(); }}
-              className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              <input type="password" value={pw} onChange={e => setPw(e.target.value)}
-                placeholder="비밀번호" aria-label="관리자 비밀번호"
-                className="w-[180px] rounded-xl border border-line bg-paper/60 px-4 py-3 text-[15px] text-ink text-center focus:border-cobalt transition-colors" />
-              <button type="submit"
-                className="rounded-xl bg-ink px-5 py-3 text-[13.5px] font-semibold text-paper hover:bg-cobalt transition-colors">확인</button>
-            </form>
-          </div>
-        </section>
+          <AdminGate title="근무 요약" pw={pw} setPw={setPw} onUnlock={unlock} />
         ) : (
         <section className="mt-16">
           <div className="flex flex-wrap items-center gap-4 mb-5">
