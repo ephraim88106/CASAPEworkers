@@ -497,6 +497,305 @@ function MonthView({ db, month, setMonth, settings, saveSettings, onGoDate, onCS
   );
 }
 
+/* ─────────── 재고 조사 ─────────── */
+const IKEY = "casape-inventory-v1";
+const CATS = ["주방","홀","소모품","기타"];
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const STALE_MS = 7 * 86400000;   /* 이보다 오래 조사 안 한 품목은 표시 */
+
+function loadInv(){
+  try{
+    const r = localStorage.getItem(IKEY); const o = r ? JSON.parse(r) : {};
+    return { items: Array.isArray(o.items) ? o.items : [],
+             orders: Array.isArray(o.orders) ? o.orders : [] };
+  }catch(e){ return { items:[], orders:[] }; }
+}
+const agoText = ts => {
+  if(!ts) return "기록 없음";
+  const d = Math.floor((Date.now() - ts) / 86400000);
+  if(d <= 0) return "오늘 " + hhmm(ts);
+  if(d === 1) return "어제 " + hhmm(ts);
+  return d + "일 전";
+};
+const mdText = ts => { const d = new Date(ts); return (d.getMonth()+1) + "/" + d.getDate() + " " + hhmm(ts); };
+
+function InventoryView({ inv, saveInv, say, onText }){
+  const [form, setForm] = useState({ cat:"주방", name:"", unit:"개", par:"", qty:"" });
+  const items = inv.items, orders = inv.orders;
+
+  const pendingOf = id => orders.find(o => o.itemId === id && !o.got) || null;
+  const sorted = items.slice().sort((a,b) =>
+    (CATS.indexOf(a.cat) - CATS.indexOf(b.cat)) || a.name.localeCompare(b.name, "ko"));
+  const short = i => (i.par || 0) > 0 && (i.qty || 0) < i.par;
+  const needList = sorted.filter(short);
+  const waiting = orders.filter(o => !o.got);
+  const received = orders.filter(o => o.got).slice(0, 20);
+  const isStale = i => !i.updated || (Date.now() - i.updated) > STALE_MS;
+  const staleCount = items.filter(isStale).length;
+
+  const setItems  = next => saveInv({ ...inv, items: next });
+  const setOrders = next => saveInv({ ...inv, orders: next });
+
+  function addItem(e){
+    e.preventDefault();
+    const name = form.name.trim();
+    if(!name){ say("품목 이름을 입력해 주세요"); return; }
+    if(items.some(i => i.name === name)){ say("이미 등록된 품목입니다"); return; }
+    const it = { id:uid(), cat:form.cat, name, unit:(form.unit.trim() || "개"),
+                 par:Math.max(0, Math.round(+form.par || 0)),
+                 qty:Math.max(0, Math.round(+form.qty || 0)),
+                 updated: form.qty !== "" ? Date.now() : null };
+    setItems(items.concat([it]));
+    setForm({ cat:form.cat, name:"", unit:form.unit, par:"", qty:"" });
+    say(`${name} 품목을 추가했습니다`);
+  }
+  const patch = (id, p) => setItems(items.map(i => i.id === id ? { ...i, ...p } : i));
+  const count = (id, v) => patch(id, { qty:Math.max(0, Math.round(+v || 0)), updated:Date.now() });
+  const setPar = (id, v) => patch(id, { par:Math.max(0, Math.round(+v || 0)) });
+  function removeItem(it){
+    if(!window.confirm(`${it.name} 품목을 목록에서 지울까요?`)) return;
+    setItems(items.filter(i => i.id !== it.id));
+    say(`${it.name} 품목을 지웠습니다`);
+  }
+
+  function order(it){
+    const need = Math.max(1, (it.par || 0) - (it.qty || 0));
+    setOrders([{ id:uid(), itemId:it.id, name:it.name, unit:it.unit, qty:need, at:Date.now(), got:null }].concat(orders));
+    say(`${it.name} ${need}${it.unit} 주문 기록`);
+  }
+  function orderAll(){
+    const fresh = needList.filter(i => !pendingOf(i.id));
+    if(!fresh.length){ say("새로 주문할 품목이 없습니다"); return; }
+    const t = Date.now();
+    const add = fresh.map(i => ({ id:uid(), itemId:i.id, name:i.name, unit:i.unit,
+                                  qty:Math.max(1, (i.par||0) - (i.qty||0)), at:t, got:null }));
+    setOrders(add.concat(orders));
+    say(`${fresh.length}개 품목을 주문 기록했습니다`);
+  }
+  function receive(o){
+    const t = Date.now();
+    const nextItems = items.map(i => i.id === o.itemId ? { ...i, qty:(i.qty || 0) + o.qty, updated:t } : i);
+    saveInv({ ...inv, items:nextItems, orders:orders.map(x => x.id === o.id ? { ...x, got:t } : x) });
+    say(`${o.name} ${o.qty}${o.unit} 입고 — 재고에 더했습니다`);
+  }
+  function dropOrder(o){ setOrders(orders.filter(x => x.id !== o.id)); say(`${o.name} 주문 기록을 지웠습니다`); }
+
+  /* 복사용 텍스트 */
+  function orderListText(){
+    if(!needList.length){ say("주문 필요한 품목이 없습니다"); return; }
+    const lines = [prettyDate(todayKey()) + " 주문 목록 (카사페)"];
+    CATS.forEach(c => {
+      const g = needList.filter(i => i.cat === c);
+      if(!g.length) return;
+      lines.push("", "[" + c + "]");
+      g.forEach(i => lines.push(`- ${i.name} ${Math.max(1, i.par - (i.qty||0))}${i.unit}  (현재 ${i.qty||0} / 적정 ${i.par})`));
+    });
+    onText("주문 목록", lines.join("\n"));
+  }
+  function csvText(){
+    if(!items.length){ say("내보낼 품목이 없습니다"); return; }
+    const esc = v => { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const rows = [["분류","품목","현재","적정","단위","상태","마지막 조사"]];
+    sorted.forEach(i => rows.push([i.cat, i.name, i.qty||0, i.par||0, i.unit,
+      short(i) ? "주문 필요" : "충분", i.updated ? mdText(i.updated) : ""]));
+    rows.push([], ["주문 내역"], ["주문일","품목","수량","단위","입고일"]);
+    orders.forEach(o => rows.push([mdText(o.at), o.name, o.qty, o.unit, o.got ? mdText(o.got) : "대기"]));
+    onText("재고 CSV", rows.map(r => r.map(esc).join(",")).join("\n"));
+  }
+
+  const inputCls = "rounded-xl border border-line bg-paper/60 px-3.5 py-2.5 text-[13.5px] text-ink focus:border-cobalt transition-colors";
+  const chipBtn  = "rounded-full border border-line bg-card px-3.5 py-2 text-[12.5px] font-medium text-ink2 hover:border-cobalt hover:text-cobalt transition-colors";
+
+  return (
+    <section className="mt-8">
+      {/* 집계 칩 */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        {[["품목", items.length, "border-line bg-paper2/50", "text-ink"],
+          ["주문 필요", needList.length, needList.length ? "border-gold2/45 bg-goldSoft/55" : "border-line bg-paper2/50", needList.length ? "text-gold" : "text-muted"],
+          ["주문 대기", waiting.length, waiting.length ? "border-cobalt2/35 bg-cobaltSoft/60" : "border-line bg-paper2/50", waiting.length ? "text-cobalt" : "text-muted"],
+          ["미조사 7일+", staleCount, staleCount ? "border-rest2/45 bg-restSoft/60" : "border-line bg-paper2/50", staleCount ? "text-rest" : "text-muted"]
+        ].map(([lb, v, box, ink]) => (
+          <div key={lb} className={`flex items-baseline gap-2.5 rounded-full border px-4 py-2 ${box}`}>
+            <span className={`num text-[21px] font-bold leading-none ${ink}`}>{v}</span>
+            <span className="text-[12px] text-ink2">{lb}</span>
+          </div>
+        ))}
+        <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+          <button onClick={orderListText} className={chipBtn}>주문 목록 복사</button>
+          <button onClick={csvText} className={chipBtn}>재고 CSV</button>
+        </div>
+      </div>
+
+      {/* 품목 추가 */}
+      <form onSubmit={addItem}
+        className="mt-5 rounded-[20px] border border-line bg-card px-5 py-4 shadow-[0_14px_30px_-28px_rgba(36,28,21,.45)]">
+        <div className="num text-[9.5px] font-bold tracking-[.2em] text-muted">새 품목</div>
+        <div className="mt-2.5 grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(120px,1fr))]">
+          <select value={form.cat} onChange={e => setForm({ ...form, cat:e.target.value })} className={inputCls}>
+            {CATS.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input value={form.name} onChange={e => setForm({ ...form, name:e.target.value })}
+            placeholder="품목 이름 (예: 우유)" className={`${inputCls} col-span-2 min-w-0`} />
+          <input value={form.unit} onChange={e => setForm({ ...form, unit:e.target.value })}
+            placeholder="단위" className={`${inputCls} num`} />
+          <input type="number" min="0" inputMode="numeric" value={form.par}
+            onChange={e => setForm({ ...form, par:e.target.value })}
+            placeholder="적정 수량" className={`${inputCls} num`} />
+          <input type="number" min="0" inputMode="numeric" value={form.qty}
+            onChange={e => setForm({ ...form, qty:e.target.value })}
+            placeholder="현재 수량" className={`${inputCls} num`} />
+          <button type="submit"
+            className="rounded-xl bg-ink px-5 py-2.5 text-[13.5px] font-semibold text-paper hover:bg-cobalt transition-colors whitespace-nowrap">추가</button>
+        </div>
+        <p className="mt-2.5 text-[11.5px] text-muted">
+          <b className="text-ink2">적정 수량</b>은 "이보다 적으면 주문" 기준입니다. 현재 수량이 적정 수량보다 적어지면 아래 <b className="text-gold">주문 필요 목록</b>에 자동으로 올라옵니다.
+        </p>
+      </form>
+
+      {/* 재고 조사표 */}
+      <div className="mt-8 flex items-center gap-4 mb-4">
+        <h2 className="han text-[24px] text-ink leading-none">재고 조사표</h2>
+        <div className="h-px flex-1 bg-line"></div>
+      </div>
+      {items.length === 0 ? (
+        <div className="rounded-[20px] border border-dashed border-line bg-card/60 px-6 py-12 text-center text-[13.5px] text-muted">
+          아직 등록된 품목이 없습니다. 위에서 품목을 추가해 주세요.
+        </div>
+      ) : (
+        <div className="rounded-[20px] border border-line bg-card overflow-x-auto shadow-[0_16px_36px_-30px_rgba(36,28,21,.5)]">
+          <table className="w-full min-w-[720px] text-[13.5px]">
+            <thead>
+              <tr className="bg-paper/70">
+                {["품목","현재 수량","적정","상태","마지막 조사",""].map((h,i) => (
+                  <th key={i} className="num text-left text-[9.5px] font-bold tracking-[.2em] text-muted px-5 py-3.5 border-b border-line whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map(it => {
+                const sh = short(it), pd = pendingOf(it.id), st = isStale(it);
+                return (
+                  <tr key={it.id} className={`border-b border-line2 last:border-0 transition-colors ${sh ? "bg-goldSoft/25" : "hover:bg-paper/50"}`}>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      <span className="inline-block rounded-full bg-paper2 px-2 py-[2px] text-[10.5px] font-semibold text-muted mr-2 align-middle">{it.cat}</span>
+                      <span className="font-semibold text-ink align-middle">{it.name}</span>
+                    </td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      <div className="inline-flex items-center rounded-xl border border-line bg-paper/60 overflow-hidden">
+                        <button type="button" onClick={() => count(it.id, (it.qty||0) - 1)}
+                          className="num w-9 h-9 text-[16px] text-ink2 hover:bg-paper2 transition-colors">−</button>
+                        <input type="number" min="0" inputMode="numeric" value={it.qty || 0}
+                          onFocus={e => e.target.select()} onChange={e => count(it.id, e.target.value)}
+                          className="num w-14 h-9 bg-transparent text-center text-[15px] font-semibold text-ink focus:outline-none" />
+                        <button type="button" onClick={() => count(it.id, (it.qty||0) + 1)}
+                          className="num w-9 h-9 text-[16px] text-ink2 hover:bg-paper2 transition-colors">+</button>
+                      </div>
+                      <span className="ml-2 text-[12px] text-muted">{it.unit}</span>
+                    </td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      <input type="number" min="0" inputMode="numeric" value={it.par || 0}
+                        onFocus={e => e.target.select()} onChange={e => setPar(it.id, e.target.value)}
+                        className="num w-16 rounded-lg border border-line bg-paper/60 px-2 py-1.5 text-center text-[13.5px] text-ink2 focus:border-cobalt" />
+                    </td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      {pd ? <span className="rounded-full bg-cobaltSoft px-[10px] py-[4px] text-[11.5px] font-medium text-cobalt">주문 대기 {pd.qty}{pd.unit}</span>
+                        : sh ? <span className="rounded-full bg-goldSoft px-[10px] py-[4px] text-[11.5px] font-medium text-gold">부족 {it.par - (it.qty||0)}{it.unit}</span>
+                        : <span className="rounded-full bg-paper2 px-[10px] py-[4px] text-[11.5px] font-medium text-muted">충분</span>}
+                    </td>
+                    <td className={`px-5 py-3 whitespace-nowrap text-[12.5px] ${st ? "text-rest font-semibold" : "text-muted"}`}>{agoText(it.updated)}</td>
+                    <td className="px-3 py-3 whitespace-nowrap text-right">
+                      <button type="button" onClick={() => removeItem(it)} title="품목 삭제" aria-label={`${it.name} 삭제`}
+                        className="w-8 h-8 rounded-lg text-muted hover:text-gold hover:bg-goldSoft/60 transition-colors">×</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* 주문 필요 / 주문 내역 */}
+      <div className="mt-10 grid gap-6 lg:grid-cols-2">
+        <div>
+          <div className="flex items-center gap-4 mb-4">
+            <h2 className="han text-[24px] text-ink leading-none">주문 필요 목록</h2>
+            <div className="h-px flex-1 bg-line"></div>
+            {needList.some(i => !pendingOf(i.id)) && (
+              <button onClick={orderAll}
+                className="rounded-full bg-gold2 px-4 py-2 text-[12.5px] font-semibold text-card hover:bg-gold transition-colors">전부 주문함</button>
+            )}
+          </div>
+          {needList.length === 0 ? (
+            <div className="rounded-[20px] border border-dashed border-line bg-card/60 px-6 py-10 text-center text-[13.5px] text-muted">
+              부족한 품목이 없습니다.
+            </div>
+          ) : (
+            <div className="rounded-[20px] border border-gold2/45 bg-card overflow-hidden shadow-[0_16px_36px_-30px_rgba(36,28,21,.5)]">
+              {needList.map(it => { const pd = pendingOf(it.id); return (
+                <div key={it.id} className="flex items-center gap-3 px-5 py-3.5 border-b border-line2 last:border-0">
+                  <span className="inline-block rounded-full bg-paper2 px-2 py-[2px] text-[10.5px] font-semibold text-muted whitespace-nowrap">{it.cat}</span>
+                  <span className="font-semibold text-ink min-w-0">{it.name}</span>
+                  <span className="num text-[12px] text-muted whitespace-nowrap">{it.qty||0} / {it.par}{it.unit}</span>
+                  <span className="ml-auto num text-[15px] font-bold text-gold whitespace-nowrap">{Math.max(1, it.par - (it.qty||0))}{it.unit}</span>
+                  {pd ? <span className="rounded-full bg-cobaltSoft px-3 py-1.5 text-[11.5px] font-medium text-cobalt whitespace-nowrap">주문 대기</span>
+                      : <button onClick={() => order(it)}
+                          className="rounded-full border border-gold2/60 bg-goldSoft/60 px-3.5 py-1.5 text-[12px] font-semibold text-gold hover:bg-goldSoft transition-colors whitespace-nowrap">주문함</button>}
+                </div>
+              ); })}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="flex items-center gap-4 mb-4">
+            <h2 className="han text-[24px] text-ink leading-none">주문한 내역</h2>
+            <div className="h-px flex-1 bg-line"></div>
+          </div>
+          {waiting.length === 0 && received.length === 0 ? (
+            <div className="rounded-[20px] border border-dashed border-line bg-card/60 px-6 py-10 text-center text-[13.5px] text-muted">
+              아직 주문 기록이 없습니다.
+            </div>
+          ) : (
+            <div className="rounded-[20px] border border-line bg-card overflow-hidden shadow-[0_16px_36px_-30px_rgba(36,28,21,.5)]">
+              {waiting.map(o => (
+                <div key={o.id} className="flex items-center gap-3 px-5 py-3.5 border-b border-line2 bg-cobaltSoft/25">
+                  <span className="num text-[11.5px] text-muted whitespace-nowrap">{mdText(o.at)}</span>
+                  <span className="font-semibold text-ink">{o.name}</span>
+                  <span className="num text-[14px] font-bold text-cobalt whitespace-nowrap">{o.qty}{o.unit}</span>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <button onClick={() => receive(o)}
+                      className="rounded-full bg-cobalt px-3.5 py-1.5 text-[12px] font-semibold text-card hover:bg-cobalt2 transition-colors whitespace-nowrap">입고</button>
+                    <button onClick={() => dropOrder(o)} title="주문 취소" aria-label={`${o.name} 주문 취소`}
+                      className="w-8 h-8 rounded-lg text-muted hover:text-gold hover:bg-goldSoft/60 transition-colors">×</button>
+                  </div>
+                </div>
+              ))}
+              {received.map(o => (
+                <div key={o.id} className="flex items-center gap-3 px-5 py-3 border-b border-line2 last:border-0 text-ink2">
+                  <span className="num text-[11.5px] text-muted whitespace-nowrap">{mdText(o.at)}</span>
+                  <span className="font-medium">{o.name}</span>
+                  <span className="num text-[13px] whitespace-nowrap">{o.qty}{o.unit}</span>
+                  <span className="ml-auto num text-[11.5px] text-rest whitespace-nowrap">입고 {mdText(o.got)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {orders.length > 20 + waiting.length && (
+            <p className="mt-2 text-[11.5px] text-muted">최근 입고 20건만 표시합니다. 전체는 재고 CSV로 내보내세요.</p>
+          )}
+        </div>
+      </div>
+
+      <p className="mt-8 text-[11.5px] leading-relaxed text-muted">
+        수량을 세어 넣으면 그 시각이 <b className="text-ink2">마지막 조사</b>로 기록되고, 7일 넘게 조사하지 않은 품목은 초록색으로 표시됩니다.<br />
+        <b className="text-gold">주문함</b>을 누르면 주문 내역에 쌓이고, 물건이 오면 <b className="text-cobalt">입고</b>를 눌러 주세요 — 주문 수량이 재고에 자동으로 더해집니다.<br />
+        재고 기록도 출퇴근 기록과 같이 이 기기에만 저장됩니다.
+      </p>
+    </section>
+  );
+}
+
 /* ─────────── 앱 ─────────── */
 function App(){
   const [db, setDb] = useState(loadDB);
@@ -505,6 +804,7 @@ function App(){
   const [tab, setTab] = useState("board");
   const [month, setMonth] = useState(monthKey);
   const [settings, setSettings] = useState(loadSettings);
+  const [inv, setInv] = useState(loadInv);
   const [now, setNow] = useState(Date.now());
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
@@ -537,6 +837,12 @@ function App(){
     try{ localStorage.setItem(KEY, JSON.stringify(next)); }
     catch(e){ say("저장 공간에 쓸 수 없어 이번 기록이 남지 않았습니다"); }
   }, []);
+
+  const saveInv = next => {
+    setInv(next);
+    try{ localStorage.setItem(IKEY, JSON.stringify(next)); }
+    catch(e){ say("저장 공간에 쓸 수 없어 이번 변경이 남지 않았습니다"); }
+  };
 
   const saveSettings = patch => {
     const next = Object.assign({}, settings, patch);
@@ -793,12 +1099,15 @@ function App(){
             <div className="min-w-0">
               <div className="num text-[10px] font-bold tracking-[.28em] text-cobalt">CASAPE · ATTENDANCE</div>
               <h1 className="han text-[40px] sm:text-[52px] leading-[0.95] tracking-tight mt-2.5 text-ink">
-                {tab === "month" ? "월간 정산" : (locked ? "지난 기록" : (viewKey !== todayKey() ? "어제의 마무리" : "오늘의 도장"))}
+                {tab === "month" ? "월간 정산" : tab === "inv" ? "재고 조사" : (locked ? "지난 기록" : (viewKey !== todayKey() ? "어제의 마무리" : "오늘의 도장"))}
               </h1>
               <p className="mt-2.5 text-[14px] text-ink2">
                 {tab === "month" ? (
                   <><span className="num font-semibold">{prettyMonth(month)}</span>
                     <span className="ml-2 text-muted">— 휴게시간을 뺀 실근무 시간입니다</span></>
+                ) : tab === "inv" ? (
+                  <><span className="num font-semibold">{inv.items.length}</span>개 품목
+                    <span className="ml-2 text-muted">— 수량을 세어 넣으면 주문 필요 목록이 자동으로 만들어집니다</span></>
                 ) : (
                   <><span className="num font-semibold">{yearOf(viewKey)}</span> · {prettyDate(viewKey)}
                     {!locked && <span className="ml-2 text-muted">— 이름을 누르면 도장이 찍힙니다</span>}</>
@@ -817,7 +1126,7 @@ function App(){
 
           {/* 탭 */}
           <div className="mt-7 inline-flex rounded-full border border-line bg-card p-1">
-            {[["board","출퇴근 보드"],["month","월간 정산"]].map(([k,lb]) => (
+            {[["board","출퇴근 보드"],["month","월간 정산"],["inv","재고 조사"]].map(([k,lb]) => (
               <button key={k} onClick={() => setTab(k)}
                 className={`rounded-full px-4 py-2 text-[12.5px] font-semibold transition-colors ${tab===k ? "bg-ink text-paper" : "text-ink2 hover:text-cobalt"}`}>{lb}</button>
             ))}
@@ -895,6 +1204,8 @@ function App(){
           ) : (
             <AdminGate title="월간 정산" className="mt-10" heading={false} pw={pw} setPw={setPw} onUnlock={unlock} />
           )
+        ) : tab === "inv" ? (
+          <InventoryView inv={inv} saveInv={saveInv} say={say} onText={openCSVText} />
         ) : (
         <>
         {!locked && viewKey !== todayKey() && (
